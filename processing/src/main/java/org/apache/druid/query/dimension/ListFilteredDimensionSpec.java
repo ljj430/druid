@@ -21,6 +21,7 @@ package org.apache.druid.query.dimension;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import org.apache.druid.common.config.NullHandling;
@@ -29,8 +30,8 @@ import org.apache.druid.query.filter.DimFilterUtils;
 import org.apache.druid.segment.DimensionSelector;
 import org.apache.druid.segment.IdLookup;
 
+import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -87,7 +88,7 @@ public class ListFilteredDimensionSpec extends BaseFilteredDimensionSpec
   private DimensionSelector filterWhiteList(DimensionSelector selector)
   {
     final int selectorCardinality = selector.getValueCardinality();
-    if (selectorCardinality < 0 || !selector.nameLookupPossibleInAdvance()) {
+    if (selectorCardinality < 0 || (selector.idLookup() == null && !selector.nameLookupPossibleInAdvance())) {
       return new PredicateFilteredDimensionSelector(selector, Predicates.in(values));
     }
     final int maxPossibleFilteredCardinality = values.size();
@@ -121,7 +122,14 @@ public class ListFilteredDimensionSpec extends BaseFilteredDimensionSpec
     if (selectorCardinality < 0 || !selector.nameLookupPossibleInAdvance()) {
       return new PredicateFilteredDimensionSelector(
           selector,
-          input -> !values.contains(input)
+          new Predicate<String>()
+          {
+            @Override
+            public boolean apply(@Nullable String input)
+            {
+              return !values.contains(input);
+            }
+          }
       );
     }
     final int maxPossibleFilteredCardinality = selectorCardinality;
@@ -179,16 +187,22 @@ public class ListFilteredDimensionSpec extends BaseFilteredDimensionSpec
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
+
     ListFilteredDimensionSpec that = (ListFilteredDimensionSpec) o;
-    return Objects.equals(getDelegate(), that.getDelegate())
-           && isWhitelist == that.isWhitelist
-           && Objects.equals(values, that.values);
+
+    if (isWhitelist != that.isWhitelist) {
+      return false;
+    }
+    return values.equals(that.values);
+
   }
 
   @Override
   public int hashCode()
   {
-    return Objects.hash(getDelegate(), values, isWhitelist);
+    int result = values.hashCode();
+    result = 31 * result + (isWhitelist ? 1 : 0);
+    return result;
   }
 
   @Override

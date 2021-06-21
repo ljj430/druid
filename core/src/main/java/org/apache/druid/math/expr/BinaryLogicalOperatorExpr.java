@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import java.util.Objects;
 
 // logical operators live here
-@SuppressWarnings("ClassName")
+
 class BinLtExpr extends BinaryEvalOpExprBase
 {
   BinLtExpr(String op, Expr left, Expr right)
@@ -84,7 +84,6 @@ class BinLtExpr extends BinaryEvalOpExprBase
   }
 }
 
-@SuppressWarnings("ClassName")
 class BinLeqExpr extends BinaryEvalOpExprBase
 {
   BinLeqExpr(String op, Expr left, Expr right)
@@ -141,7 +140,6 @@ class BinLeqExpr extends BinaryEvalOpExprBase
   }
 }
 
-@SuppressWarnings("ClassName")
 class BinGtExpr extends BinaryEvalOpExprBase
 {
   BinGtExpr(String op, Expr left, Expr right)
@@ -197,7 +195,6 @@ class BinGtExpr extends BinaryEvalOpExprBase
   }
 }
 
-@SuppressWarnings("ClassName")
 class BinGeqExpr extends BinaryEvalOpExprBase
 {
   BinGeqExpr(String op, Expr left, Expr right)
@@ -254,7 +251,6 @@ class BinGeqExpr extends BinaryEvalOpExprBase
   }
 }
 
-@SuppressWarnings("ClassName")
 class BinEqExpr extends BinaryEvalOpExprBase
 {
   BinEqExpr(String op, Expr left, Expr right)
@@ -310,7 +306,6 @@ class BinEqExpr extends BinaryEvalOpExprBase
   }
 }
 
-@SuppressWarnings("ClassName")
 class BinNeqExpr extends BinaryEvalOpExprBase
 {
   BinNeqExpr(String op, Expr left, Expr right)
@@ -366,7 +361,6 @@ class BinNeqExpr extends BinaryEvalOpExprBase
   }
 }
 
-@SuppressWarnings("ClassName")
 class BinAndExpr extends BinaryOpExprBase
 {
   BinAndExpr(String op, Expr left, Expr right)

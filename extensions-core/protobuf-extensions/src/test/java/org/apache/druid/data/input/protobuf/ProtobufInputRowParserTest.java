@@ -21,7 +21,6 @@ package org.apache.druid.data.input.protobuf;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.protobuf.Timestamp;
 import org.apache.druid.data.input.InputRow;
 import org.apache.druid.data.input.impl.DimensionsSpec;
 import org.apache.druid.data.input.impl.JSONParseSpec;
@@ -43,7 +42,6 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -54,7 +52,6 @@ public class ProtobufInputRowParserTest
 
   private ParseSpec parseSpec;
   private ParseSpec flatParseSpec;
-  private ParseSpec flatParseSpecWithComplexTimestamp;
   private FileBasedProtobufBytesDecoder decoder;
 
   @Before
@@ -93,20 +90,6 @@ public class ProtobufInputRowParserTest
             null,
             null
     );
-
-    flatParseSpecWithComplexTimestamp = new JSONParseSpec(
-        new TimestampSpec("otherTimestamp", "iso", null),
-        new DimensionsSpec(Lists.newArrayList(
-            new StringDimensionSchema("event"),
-            new StringDimensionSchema("id"),
-            new StringDimensionSchema("someOtherId"),
-            new StringDimensionSchema("isValid")
-        ), null, null),
-
-        null,
-        null,
-        null
-    );
     decoder = new FileBasedProtobufBytesDecoder("prototest.desc", "ProtoTestEvent");
   }
 
@@ -118,11 +101,47 @@ public class ProtobufInputRowParserTest
 
     //create binary of proto test event
     DateTime dateTime = new DateTime(2012, 7, 12, 9, 30, ISOChronology.getInstanceUTC());
+    ProtoTestEventWrapper.ProtoTestEvent event = ProtoTestEventWrapper.ProtoTestEvent.newBuilder()
+                                                                                     .setDescription("description")
+                                                                                     .setEventType(ProtoTestEventWrapper.ProtoTestEvent.EventCategory.CATEGORY_ONE)
+                                                                                     .setId(4711L)
+                                                                                     .setIsValid(true)
+                                                                                     .setSomeOtherId(4712)
+                                                                                     .setTimestamp(dateTime.toString())
+                                                                                     .setSomeFloatColumn(47.11F)
+                                                                                     .setSomeIntColumn(815)
+                                                                                     .setSomeLongColumn(816L)
+                                                                                     .setFoo(ProtoTestEventWrapper.ProtoTestEvent.Foo
+                                                                                                 .newBuilder()
+                                                                                                 .setBar("baz"))
+                                                                                     .addBar(ProtoTestEventWrapper.ProtoTestEvent.Foo
+                                                                                                 .newBuilder()
+                                                                                                 .setBar("bar0"))
+                                                                                     .addBar(ProtoTestEventWrapper.ProtoTestEvent.Foo
+                                                                                                 .newBuilder()
+                                                                                                 .setBar("bar1"))
+                                                                                     .build();
 
-    ProtoTestEventWrapper.ProtoTestEvent event = buildNestedData(dateTime);
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    event.writeTo(out);
 
-    InputRow row = parser.parseBatch(toByteBuffer(event)).get(0);
-    verifyNestedData(row, dateTime);
+    InputRow row = parser.parseBatch(ByteBuffer.wrap(out.toByteArray())).get(0);
+
+    Assert.assertEquals(dateTime.getMillis(), row.getTimestampFromEpoch());
+
+    assertDimensionEquals(row, "id", "4711");
+    assertDimensionEquals(row, "isValid", "true");
+    assertDimensionEquals(row, "someOtherId", "4712");
+    assertDimensionEquals(row, "description", "description");
+
+    assertDimensionEquals(row, "eventType", ProtoTestEventWrapper.ProtoTestEvent.EventCategory.CATEGORY_ONE.name());
+    assertDimensionEquals(row, "foobar", "baz");
+    assertDimensionEquals(row, "bar0", "bar0");
+
+
+    Assert.assertEquals(47.11F, row.getMetric("someFloatColumn").floatValue(), 0.0);
+    Assert.assertEquals(815.0F, row.getMetric("someIntColumn").floatValue(), 0.0);
+    Assert.assertEquals(816.0F, row.getMetric("someLongColumn").floatValue(), 0.0);
   }
 
   @Test
@@ -133,24 +152,35 @@ public class ProtobufInputRowParserTest
 
     //create binary of proto test event
     DateTime dateTime = new DateTime(2012, 7, 12, 9, 30, ISOChronology.getInstanceUTC());
-    ProtoTestEventWrapper.ProtoTestEvent event = buildFlatData(dateTime);
+    ProtoTestEventWrapper.ProtoTestEvent event = ProtoTestEventWrapper.ProtoTestEvent.newBuilder()
+            .setDescription("description")
+            .setEventType(ProtoTestEventWrapper.ProtoTestEvent.EventCategory.CATEGORY_ONE)
+            .setId(4711L)
+            .setIsValid(true)
+            .setSomeOtherId(4712)
+            .setTimestamp(dateTime.toString())
+            .setSomeFloatColumn(47.11F)
+            .setSomeIntColumn(815)
+            .setSomeLongColumn(816L)
+            .build();
 
-    InputRow row = parser.parseBatch(toByteBuffer(event)).get(0);
-    verifyFlatData(row, dateTime);
-  }
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    event.writeTo(out);
 
-  @Test
-  public void testParseFlatDataWithComplexTimestamp() throws Exception
-  {
-    ProtobufInputRowParser parser = new ProtobufInputRowParser(flatParseSpecWithComplexTimestamp, decoder, null, null);
+    InputRow row = parser.parseBatch(ByteBuffer.wrap(out.toByteArray())).get(0);
+    System.out.println(row);
 
-    //create binary of proto test event
-    DateTime dateTime = new DateTime(2012, 7, 12, 9, 30, ISOChronology.getInstanceUTC());
-    ProtoTestEventWrapper.ProtoTestEvent event = buildFlatDataWithComplexTimestamp(dateTime);
+    Assert.assertEquals(dateTime.getMillis(), row.getTimestampFromEpoch());
 
-    InputRow row = parser.parseBatch(toByteBuffer(event)).get(0);
+    assertDimensionEquals(row, "id", "4711");
+    assertDimensionEquals(row, "isValid", "true");
+    assertDimensionEquals(row, "someOtherId", "4712");
+    assertDimensionEquals(row, "description", "description");
 
-    verifyFlatDataWithComplexTimestamp(row, dateTime);
+
+    Assert.assertEquals(47.11F, row.getMetric("someFloatColumn").floatValue(), 0.0);
+    Assert.assertEquals(815.0F, row.getMetric("someIntColumn").floatValue(), 0.0);
+    Assert.assertEquals(816.0F, row.getMetric("someLongColumn").floatValue(), 0.0);
   }
 
   @Test
@@ -188,53 +218,7 @@ public class ProtobufInputRowParserTest
 
     //create binary of proto test event
     DateTime dateTime = new DateTime(2012, 7, 12, 9, 30, ISOChronology.getInstanceUTC());
-    ProtoTestEventWrapper.ProtoTestEvent event = buildNestedData(dateTime);
-
-    InputRow row = parser.parseBatch(toByteBuffer(event)).get(0);
-
-    verifyNestedData(row, dateTime);
-  }
-
-  private static void assertDimensionEquals(InputRow row, String dimension, Object expected)
-  {
-    List<String> values = row.getDimension(dimension);
-    Assert.assertEquals(1, values.size());
-    Assert.assertEquals(expected, values.get(0));
-  }
-
-  static ProtoTestEventWrapper.ProtoTestEvent buildFlatData(DateTime dateTime)
-  {
-    return ProtoTestEventWrapper.ProtoTestEvent.newBuilder()
-        .setDescription("description")
-        .setEventType(ProtoTestEventWrapper.ProtoTestEvent.EventCategory.CATEGORY_ONE)
-        .setId(4711L)
-        .setIsValid(true)
-        .setSomeOtherId(4712)
-        .setTimestamp(dateTime.toString())
-        .setSomeFloatColumn(47.11F)
-        .setSomeIntColumn(815)
-        .setSomeLongColumn(816L)
-        .build();
-  }
-
-  static void verifyFlatData(InputRow row, DateTime dateTime)
-  {
-    Assert.assertEquals(dateTime.getMillis(), row.getTimestampFromEpoch());
-
-    assertDimensionEquals(row, "id", "4711");
-    assertDimensionEquals(row, "isValid", "true");
-    assertDimensionEquals(row, "someOtherId", "4712");
-    assertDimensionEquals(row, "description", "description");
-
-
-    Assert.assertEquals(47.11F, row.getMetric("someFloatColumn").floatValue(), 0.0);
-    Assert.assertEquals(815.0F, row.getMetric("someIntColumn").floatValue(), 0.0);
-    Assert.assertEquals(816.0F, row.getMetric("someLongColumn").floatValue(), 0.0);
-  }
-
-  static ProtoTestEventWrapper.ProtoTestEvent buildNestedData(DateTime dateTime)
-  {
-    return ProtoTestEventWrapper.ProtoTestEvent.newBuilder()
+    ProtoTestEventWrapper.ProtoTestEvent event = ProtoTestEventWrapper.ProtoTestEvent.newBuilder()
         .setDescription("description")
         .setEventType(ProtoTestEventWrapper.ProtoTestEvent.EventCategory.CATEGORY_ONE)
         .setId(4711L)
@@ -254,10 +238,12 @@ public class ProtobufInputRowParserTest
             .newBuilder()
             .setBar("bar1"))
         .build();
-  }
 
-  static void verifyNestedData(InputRow row, DateTime dateTime)
-  {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    event.writeTo(out);
+
+    InputRow row = parser.parseBatch(ByteBuffer.wrap(out.toByteArray())).get(0);
+
     Assert.assertEquals(dateTime.getMillis(), row.getTimestampFromEpoch());
 
     assertDimensionEquals(row, "id", "4711");
@@ -275,33 +261,10 @@ public class ProtobufInputRowParserTest
     Assert.assertEquals(816.0F, row.getMetric("someLongColumn").floatValue(), 0.0);
   }
 
-  static ProtoTestEventWrapper.ProtoTestEvent buildFlatDataWithComplexTimestamp(DateTime dateTime)
+  private void assertDimensionEquals(InputRow row, String dimension, Object expected)
   {
-    Timestamp timestamp = Timestamp.newBuilder().setSeconds(dateTime.getMillis() / 1000).setNanos((int) ((dateTime.getMillis() % 1000) * 1000 * 1000)).build();
-    return ProtoTestEventWrapper.ProtoTestEvent.newBuilder()
-        .setDescription("description")
-        .setEventType(ProtoTestEventWrapper.ProtoTestEvent.EventCategory.CATEGORY_ONE)
-        .setId(4711L)
-        .setIsValid(true)
-        .setSomeOtherId(4712)
-        .setOtherTimestamp(timestamp)
-        .setTimestamp("unused")
-        .setSomeFloatColumn(47.11F)
-        .setSomeIntColumn(815)
-        .setSomeLongColumn(816L)
-        .build();
-  }
-
-  static void verifyFlatDataWithComplexTimestamp(InputRow row, DateTime dateTime)
-  {
-    verifyFlatData(row, dateTime);
-  }
-
-  static ByteBuffer toByteBuffer(ProtoTestEventWrapper.ProtoTestEvent event) throws IOException
-  {
-    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-      event.writeTo(out);
-      return ByteBuffer.wrap(out.toByteArray());
-    }
+    List<String> values = row.getDimension(dimension);
+    Assert.assertEquals(1, values.size());
+    Assert.assertEquals(expected, values.get(0));
   }
 }

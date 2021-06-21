@@ -87,6 +87,10 @@ public class TimeExtractionTopNAlgorithm extends BaseTopNAlgorithm<int[], Map<Co
       Map<Comparable<?>, Aggregator[]> aggregatesStore
   )
   {
+    if (params.getCardinality() < 0) {
+      throw new UnsupportedOperationException("Cannot operate on a dimension with unknown cardinality");
+    }
+
     final Cursor cursor = params.getCursor();
     final DimensionSelector dimSelector = params.getDimSelector();
 

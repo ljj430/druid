@@ -48,7 +48,7 @@ public class TopNColumnAggregatesProcessorFactory
     final ValueType selectorType = capabilities.getType();
 
     if (selectorType.equals(ValueType.STRING)) {
-      return new StringTopNColumnAggregatesProcessor(capabilities, dimensionType);
+      return new StringTopNColumnAggregatesProcessor(dimensionType);
     } else if (selectorType.isNumeric()) {
       final Function<Object, Comparable<?>> converter;
       final ValueType strategyType;

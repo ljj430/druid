@@ -22,13 +22,14 @@ package org.apache.druid.query.aggregation;
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Supplier;
+import org.apache.druid.java.util.common.StringUtils;
 import org.apache.druid.math.expr.ExprMacroTable;
 import org.apache.druid.segment.BaseFloatColumnValueSelector;
 import org.apache.druid.segment.vector.VectorColumnSelectorFactory;
 import org.apache.druid.segment.vector.VectorValueSelector;
 
 import javax.annotation.Nullable;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,8 +37,6 @@ import java.util.List;
  */
 public class FloatMaxAggregatorFactory extends SimpleFloatAggregatorFactory
 {
-  private final Supplier<byte[]> cacheKey;
-
   @JsonCreator
   public FloatMaxAggregatorFactory(
       @JsonProperty("name") String name,
@@ -47,11 +46,6 @@ public class FloatMaxAggregatorFactory extends SimpleFloatAggregatorFactory
   )
   {
     super(macroTable, name, fieldName, expression);
-    this.cacheKey = AggregatorUtil.getSimpleAggregatorCacheKeySupplier(
-        AggregatorUtil.FLOAT_MAX_CACHE_TYPE_ID,
-        fieldName,
-        fieldExpression
-    );
   }
 
   public FloatMaxAggregatorFactory(String name, String fieldName)
@@ -120,7 +114,15 @@ public class FloatMaxAggregatorFactory extends SimpleFloatAggregatorFactory
   @Override
   public byte[] getCacheKey()
   {
-    return cacheKey.get();
+    byte[] fieldNameBytes = StringUtils.toUtf8WithNullToEmpty(fieldName);
+    byte[] expressionBytes = StringUtils.toUtf8WithNullToEmpty(expression);
+
+    return ByteBuffer.allocate(2 + fieldNameBytes.length + expressionBytes.length)
+                     .put(AggregatorUtil.FLOAT_MAX_CACHE_TYPE_ID)
+                     .put(fieldNameBytes)
+                     .put(AggregatorUtil.STRING_SEPARATOR)
+                     .put(expressionBytes)
+                     .array();
   }
 
   @Override

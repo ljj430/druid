@@ -38,7 +38,7 @@ public class StrposOperatorConversion implements SqlOperatorConversion
       .operatorBuilder("STRPOS")
       .operandTypes(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)
       .functionCategory(SqlFunctionCategory.STRING)
-      .returnTypeCascadeNullable(SqlTypeName.INTEGER)
+      .returnTypeNonNull(SqlTypeName.INTEGER)
       .build();
 
   @Override

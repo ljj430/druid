@@ -25,7 +25,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.RangeSet;
 import org.apache.druid.math.expr.Expr;
 import org.apache.druid.math.expr.ExprMacroTable;
@@ -41,7 +40,6 @@ public class ExpressionDimFilter extends AbstractOptimizableDimFilter implements
 {
   private final String expression;
   private final Supplier<Expr> parsed;
-  private final Supplier<byte[]> cacheKey;
   @Nullable
   private final FilterTuning filterTuning;
 
@@ -55,11 +53,6 @@ public class ExpressionDimFilter extends AbstractOptimizableDimFilter implements
     this.expression = expression;
     this.filterTuning = filterTuning;
     this.parsed = Parser.lazyParse(expression, macroTable);
-    this.cacheKey = Suppliers.memoize(() -> {
-      return new CacheKeyBuilder(DimFilterUtils.EXPRESSION_CACHE_ID)
-          .appendCacheable(parsed.get())
-          .build();
-    });
   }
 
   @VisibleForTesting
@@ -109,7 +102,9 @@ public class ExpressionDimFilter extends AbstractOptimizableDimFilter implements
   @Override
   public byte[] getCacheKey()
   {
-    return cacheKey.get();
+    return new CacheKeyBuilder(DimFilterUtils.EXPRESSION_CACHE_ID)
+        .appendString(expression)
+        .build();
   }
 
   @Override

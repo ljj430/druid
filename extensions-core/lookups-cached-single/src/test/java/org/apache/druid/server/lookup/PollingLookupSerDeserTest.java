@@ -103,7 +103,6 @@ public class PollingLookupSerDeserTest
     }
 
     @Override
-    @SuppressWarnings("EqualsHashCode")
     public boolean equals(Object obj)
     {
       return obj instanceof MockDataFetcher;

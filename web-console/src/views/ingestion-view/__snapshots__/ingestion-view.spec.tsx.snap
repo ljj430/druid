@@ -597,7 +597,6 @@ exports[`tasks view matches snapshot 1`] = `
     icon="error"
     intent="primary"
     isOpen={false}
-    loading={false}
     onConfirm={[Function]}
   >
     <p />

@@ -54,6 +54,7 @@
     <dependency>
       <groupId>com.fasterxml.jackson.module</groupId>
       <artifactId>jackson-module-guice</artifactId>
+      <version>${jackson.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -114,8 +115,8 @@
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-sts</artifactId>
-      <version>${aws.sdk.version}</version>
-    </dependency>
+      <scope>provided</scope>
+    </dependency>    
     <!-- Tests -->
     <dependency>
       <groupId>org.apache.druid</groupId>

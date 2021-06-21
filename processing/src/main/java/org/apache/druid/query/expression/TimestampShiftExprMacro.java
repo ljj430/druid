@@ -99,11 +99,7 @@ public class TimestampShiftExprMacro implements ExprMacroTable.ExprMacro
     @Override
     public ExprEval eval(final ObjectBinding bindings)
     {
-      ExprEval timestamp = args.get(0).eval(bindings);
-      if (timestamp.isNumericNull()) {
-        return ExprEval.of(null);
-      }
-      return ExprEval.of(chronology.add(period, timestamp.asLong(), step));
+      return ExprEval.of(chronology.add(period, args.get(0).eval(bindings).asLong(), step));
     }
 
     @Override
@@ -132,14 +128,10 @@ public class TimestampShiftExprMacro implements ExprMacroTable.ExprMacro
     @Override
     public ExprEval eval(final ObjectBinding bindings)
     {
-      ExprEval timestamp = args.get(0).eval(bindings);
-      if (timestamp.isNumericNull()) {
-        return ExprEval.of(null);
-      }
       final Period period = getPeriod(args, bindings);
       final Chronology chronology = getTimeZone(args, bindings);
       final int step = getStep(args, bindings);
-      return ExprEval.of(chronology.add(period, timestamp.asLong(), step));
+      return ExprEval.of(chronology.add(period, args.get(0).eval(bindings).asLong(), step));
     }
 
     @Override

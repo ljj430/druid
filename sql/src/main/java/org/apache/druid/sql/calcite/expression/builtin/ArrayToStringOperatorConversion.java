@@ -47,7 +47,7 @@ public class ArrayToStringOperatorConversion implements SqlOperatorConversion
           )
       )
       .functionCategory(SqlFunctionCategory.STRING)
-      .returnTypeCascadeNullable(SqlTypeName.VARCHAR)
+      .returnTypeNonNull(SqlTypeName.VARCHAR)
       .build();
 
   @Override

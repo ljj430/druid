@@ -124,7 +124,7 @@ export const TimeMenuItems = React.memo(function TimeMenuItems(props: TimeMenuIt
         <MenuItem
           text={label}
           onClick={() => {
-            onQueryChange(parsedQuery.removeColumnFromWhere(columnName).addWhere(clause), true);
+            onQueryChange(parsedQuery.removeColumnFromWhere(columnName).addToWhere(clause), true);
           }}
         />
       );
@@ -180,15 +180,15 @@ export const TimeMenuItems = React.memo(function TimeMenuItems(props: TimeMenuIt
 
   function renderRemoveGroupBy(): JSX.Element | undefined {
     const { columnName, parsedQuery, onQueryChange } = props;
-    const groupedSelectIndexes = parsedQuery.getGroupedSelectIndexesForColumn(columnName);
-    if (!groupedSelectIndexes.length) return;
+    const selectIndex = parsedQuery.getSelectIndexForColumn(columnName);
+    if (!parsedQuery.isGroupedSelectIndex(selectIndex)) return;
 
     return (
       <MenuItem
         icon={IconNames.UNGROUP_OBJECTS}
         text="Remove group by"
         onClick={() => {
-          onQueryChange(parsedQuery.removeSelectIndexes(groupedSelectIndexes), true);
+          onQueryChange(parsedQuery.removeSelectIndex(selectIndex), true);
         }}
       />
     );
@@ -204,13 +204,7 @@ export const TimeMenuItems = React.memo(function TimeMenuItems(props: TimeMenuIt
         <MenuItem
           text={prettyPrintSql(ex)}
           onClick={() => {
-            onQueryChange(
-              parsedQuery.addSelect(ex.as(alias), {
-                insertIndex: 'last-grouping',
-                addToGroupBy: 'end',
-              }),
-              true,
-            );
+            onQueryChange(parsedQuery.addToGroupBy(ex.as(alias)), true);
           }}
         />
       );
@@ -265,7 +259,7 @@ export const TimeMenuItems = React.memo(function TimeMenuItems(props: TimeMenuIt
         <MenuItem
           text={prettyPrintSql(ex)}
           onClick={() => {
-            onQueryChange(parsedQuery.addSelect(ex.as(alias)), true);
+            onQueryChange(parsedQuery.addSelectExpression(ex.as(alias)), true);
           }}
         />
       );

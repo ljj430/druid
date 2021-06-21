@@ -19,7 +19,6 @@
 
 package org.apache.druid.data.input.s3;
 
-import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
@@ -41,7 +40,6 @@ import com.google.inject.Binder;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Provides;
-import org.apache.druid.common.aws.AWSCredentialsUtils;
 import org.apache.druid.data.input.ColumnsFilter;
 import org.apache.druid.data.input.InputRow;
 import org.apache.druid.data.input.InputRowSchema;
@@ -122,7 +120,7 @@ public class S3InputSourceTest extends InitializedNullHandlingTest
   );
 
   private static final S3InputSourceConfig CLOUD_CONFIG_PROPERTIES = new S3InputSourceConfig(
-      new DefaultPasswordProvider("myKey"), new DefaultPasswordProvider("mySecret"), null, null);
+      new DefaultPasswordProvider("myKey"), new DefaultPasswordProvider("mySecret"));
 
   private static final List<CloudObjectLocation> EXPECTED_LOCATION =
       ImmutableList.of(new CloudObjectLocation("foo", "bar/file.csv"));
@@ -223,7 +221,6 @@ public class S3InputSourceTest extends InitializedNullHandlingTest
   {
     S3InputSourceConfig mockConfigPropertiesWithoutKeyAndSecret = EasyMock.createMock(S3InputSourceConfig.class);
     EasyMock.reset(mockConfigPropertiesWithoutKeyAndSecret);
-    EasyMock.expect(mockConfigPropertiesWithoutKeyAndSecret.getAssumeRoleArn()).andStubReturn(null);
     EasyMock.expect(mockConfigPropertiesWithoutKeyAndSecret.isCredentialsConfigured())
             .andStubReturn(false);
     EasyMock.replay(mockConfigPropertiesWithoutKeyAndSecret);
@@ -282,7 +279,6 @@ public class S3InputSourceTest extends InitializedNullHandlingTest
         null,
         EXPECTED_LOCATION,
         null
-
     );
     final S3InputSource serdeWithPrefixes =
         MAPPER.readValue(MAPPER.writeValueAsString(withPrefixes), S3InputSource.class);
@@ -668,25 +664,7 @@ public class S3InputSourceTest extends InitializedNullHandlingTest
     DruidModule baseModule = new TestS3Module();
     final Injector injector = Guice.createInjector(
         new ObjectMapperModule(),
-        baseModule,
-        new DruidModule()
-        {
-          @Provides
-          public AWSCredentialsProvider getAWSCredentialsProvider()
-          {
-            return AWSCredentialsUtils.defaultAWSCredentialsProviderChain(null);
-          }
-
-          @Override public List<? extends Module> getJacksonModules()
-          {
-            return Collections.emptyList();
-          }
-
-          @Override public void configure(Binder binder)
-          {
-
-          }
-        }
+        baseModule
     );
     final ObjectMapper baseMapper = injector.getInstance(ObjectMapper.class);
 

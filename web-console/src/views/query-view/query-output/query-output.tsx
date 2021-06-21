@@ -244,7 +244,7 @@ export const QueryOutput = React.memo(function QueryOutput(props: QueryOutputPro
         text={`${having ? 'Having' : 'Filter on'}: ${prettyPrintSql(clause)}`}
         onClick={() => {
           onQueryChange(
-            having ? parsedQuery.addHaving(clause) : parsedQuery.addWhere(clause),
+            having ? parsedQuery.addToHaving(clause) : parsedQuery.addToWhere(clause),
             true,
           );
         }}
@@ -287,7 +287,7 @@ export const QueryOutput = React.memo(function QueryOutput(props: QueryOutputPro
         if (having && outputName) {
           ex = SqlRef.column(outputName);
         } else {
-          ex = selectValue.getUnderlyingExpression();
+          ex = selectValue.expression as SqlExpression;
         }
       } else if (parsedQuery.hasStarInSelect()) {
         ex = SqlRef.column(header);
@@ -357,9 +357,17 @@ export const QueryOutput = React.memo(function QueryOutput(props: QueryOutputPro
     setRenamingColumn(-1);
     if (renameTo && parsedQuery) {
       if (parsedQuery.hasStarInSelect()) return;
-      const selectExpression = parsedQuery.getSelectExpressionForIndex(renamingColumn);
+      const selectExpression = parsedQuery.selectExpressions.get(renamingColumn);
       if (!selectExpression) return;
-      onQueryChange(parsedQuery.changeSelect(renamingColumn, selectExpression.as(renameTo)), true);
+      onQueryChange(
+        parsedQuery.changeSelectExpressions(
+          parsedQuery.selectExpressions.change(
+            renamingColumn,
+            selectExpression.changeAliasName(renameTo),
+          ),
+        ),
+        true,
+      );
     }
   }
 

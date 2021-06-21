@@ -2186,7 +2186,7 @@ public abstract class SeekableStreamSupervisor<PartitionIdType, SequenceOffsetTy
             taskGroupId
         );
 
-        newlyDiscovered.computeIfAbsent(taskGroupId, k -> new ArrayList<>()).add(partitionId);
+        newlyDiscovered.computeIfAbsent(taskGroupId, ArrayList::new).add(partitionId);
       }
     }
 

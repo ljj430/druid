@@ -324,7 +324,7 @@ public class HttpLoadQueuePeon extends LoadQueuePeon
 
       ScheduledExecutors.scheduleAtFixedRate(
           processingExecutor,
-          config.getHttpLoadQueuePeonRepeatDelay(),
+          new Duration(config.getHttpLoadQueuePeonRepeatDelay()),
           () -> {
             if (!stopped) {
               doSegmentManagement();

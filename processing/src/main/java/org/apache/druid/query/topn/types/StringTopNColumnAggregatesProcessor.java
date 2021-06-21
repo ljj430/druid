@@ -29,7 +29,6 @@ import org.apache.druid.segment.DimensionDictionarySelector;
 import org.apache.druid.segment.DimensionHandlerUtils;
 import org.apache.druid.segment.DimensionSelector;
 import org.apache.druid.segment.StorageAdapter;
-import org.apache.druid.segment.column.ColumnCapabilities;
 import org.apache.druid.segment.column.ValueType;
 import org.apache.druid.segment.data.IndexedInts;
 
@@ -39,25 +38,18 @@ import java.util.function.Function;
 
 public class StringTopNColumnAggregatesProcessor implements TopNColumnAggregatesProcessor<DimensionSelector>
 {
-  private final ColumnCapabilities capabilities;
   private final Function<Object, Comparable<?>> dimensionValueConverter;
   private HashMap<Comparable<?>, Aggregator[]> aggregatesStore;
 
-  public StringTopNColumnAggregatesProcessor(final ColumnCapabilities capabilities, final ValueType dimensionType)
+  public StringTopNColumnAggregatesProcessor(final ValueType dimensionType)
   {
-    this.capabilities = capabilities;
     this.dimensionValueConverter = DimensionHandlerUtils.converterFromTypeToType(ValueType.STRING, dimensionType);
   }
 
   @Override
   public int getCardinality(DimensionSelector selector)
   {
-    // only report the underlying selector cardinality if the column the selector is for is dictionary encoded, and
-    // the dictionary values are unique, that is they have a 1:1 mapping between dictionaryId and column value
-    if (capabilities.isDictionaryEncoded().and(capabilities.areDictionaryValuesUnique()).isTrue()) {
-      return selector.getValueCardinality();
-    }
-    return DimensionDictionarySelector.CARDINALITY_UNKNOWN;
+    return selector.getValueCardinality();
   }
 
   @Override
@@ -116,18 +108,7 @@ public class StringTopNColumnAggregatesProcessor implements TopNColumnAggregates
       Aggregator[][] rowSelector
   )
   {
-    final boolean notUnknown = selector.getValueCardinality() != DimensionDictionarySelector.CARDINALITY_UNKNOWN;
-    final boolean unique = capabilities.isDictionaryEncoded().and(capabilities.areDictionaryValuesUnique()).isTrue();
-    // we must know cardinality to use array based aggregation
-    // we check for uniquely dictionary encoded values because non-unique (meaning dictionary ids do not have a 1:1
-    // relation with values) negates many of the benefits of array aggregation:
-    // - if different dictionary ids map to the same value but dictionary ids are unique to that value (*:1), then
-    //   array aggregation will be correct but will still have to potentially perform many map lookups and lose the
-    //   performance benefit array aggregation is trying to provide
-    // - in cases where the same dictionary ids map to different values (1:* or *:*), results can be entirely
-    //   incorrect since an aggregator for a different value might be chosen from the array based on the re-used
-    //   dictionary id
-    if (notUnknown && unique) {
+    if (selector.getValueCardinality() != DimensionDictionarySelector.CARDINALITY_UNKNOWN) {
       return scanAndAggregateWithCardinalityKnown(query, cursor, selector, rowSelector);
     } else {
       return scanAndAggregateWithCardinalityUnknown(query, cursor, selector);

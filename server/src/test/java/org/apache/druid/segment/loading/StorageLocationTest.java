@@ -47,7 +47,6 @@ public class StorageLocationTest
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   @Test
-  @SuppressWarnings("GuardedBy")
   public void testStorageLocationFreePercent()
   {
     // free space ignored only maxSize matters
@@ -67,7 +66,6 @@ public class StorageLocationTest
   }
 
   @Test
-  @SuppressWarnings("GuardedBy")
   public void testStorageLocationRealFileSystem() throws IOException
   {
     File file = temporaryFolder.newFolder();
@@ -183,7 +181,6 @@ public class StorageLocationTest
     Assert.assertFalse(loc.release("testPath", 100L));
   }
 
-  @SuppressWarnings("GuardedBy")
   private void verifyLoc(long maxSize, StorageLocation loc)
   {
     Assert.assertEquals(maxSize, loc.availableSizeBytes());

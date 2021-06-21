@@ -23,10 +23,8 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import org.apache.druid.annotations.SubclassesMustOverrideEqualsAndHashCode;
-import org.apache.druid.java.util.common.Cacheable;
 import org.apache.druid.java.util.common.ISE;
 import org.apache.druid.math.expr.vector.ExprVectorProcessor;
-import org.apache.druid.query.cache.CacheKeyBuilder;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -40,9 +38,8 @@ import java.util.Set;
  * immutable.
  */
 @SubclassesMustOverrideEqualsAndHashCode
-public interface Expr extends Cacheable
+public interface Expr
 {
-
   String NULL_LITERAL = "null";
   Joiner ARG_JOINER = Joiner.on(", ");
 
@@ -172,12 +169,6 @@ public interface Expr extends Cacheable
   default <T> ExprVectorProcessor<T> buildVectorized(VectorInputBindingInspector inspector)
   {
     throw Exprs.cannotVectorize(this);
-  }
-
-  @Override
-  default byte[] getCacheKey()
-  {
-    return new CacheKeyBuilder(Exprs.EXPR_CACHE_KEY).appendString(stringify()).build();
   }
 
   /**

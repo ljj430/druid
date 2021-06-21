@@ -234,10 +234,10 @@ public class ExpressionLambdaAggregatorFactory extends AggregatorFactory
         .appendStrings(fields)
         .appendString(initialValueExpressionString)
         .appendString(initialCombineValueExpressionString)
-        .appendCacheable(foldExpression.get())
-        .appendCacheable(combineExpression.get())
-        .appendCacheable(combineExpression.get())
-        .appendCacheable(finalizeExpression.get())
+        .appendString(foldExpressionString)
+        .appendString(combineExpressionString)
+        .appendString(compareExpressionString)
+        .appendString(finalizeExpressionString)
         .appendInt(maxSizeBytes.getBytesInInt())
         .build();
   }

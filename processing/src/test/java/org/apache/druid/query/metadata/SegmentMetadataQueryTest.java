@@ -35,7 +35,6 @@ import org.apache.druid.query.BySegmentResultValueClass;
 import org.apache.druid.query.Druids;
 import org.apache.druid.query.FinalizeResultsQueryRunner;
 import org.apache.druid.query.Query;
-import org.apache.druid.query.QueryContexts;
 import org.apache.druid.query.QueryPlus;
 import org.apache.druid.query.QueryRunner;
 import org.apache.druid.query.QueryRunnerFactory;
@@ -916,7 +915,7 @@ public class SegmentMetadataQueryTest
 
     TestHelper.assertExpectedObjects(
         ImmutableList.of(bySegmentResult, bySegmentResult),
-        myRunner.run(QueryPlus.wrap(testQuery.withOverriddenContext(ImmutableMap.of(QueryContexts.BY_SEGMENT_KEY, true)))),
+        myRunner.run(QueryPlus.wrap(testQuery.withOverriddenContext(ImmutableMap.of("bySegment", true)))),
         "failed SegmentMetadata bySegment query"
     );
     exec.shutdownNow();

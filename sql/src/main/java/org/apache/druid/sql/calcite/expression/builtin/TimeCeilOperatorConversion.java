@@ -41,7 +41,7 @@ public class TimeCeilOperatorConversion implements SqlOperatorConversion
       .operatorBuilder("TIME_CEIL")
       .operandTypes(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)
       .requiredOperands(2)
-      .returnTypeCascadeNullable(SqlTypeName.TIMESTAMP)
+      .returnTypeNonNull(SqlTypeName.TIMESTAMP)
       .functionCategory(SqlFunctionCategory.TIMEDATE)
       .build();
 
