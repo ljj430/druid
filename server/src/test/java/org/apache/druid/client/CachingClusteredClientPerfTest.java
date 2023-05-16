@@ -49,10 +49,11 @@ import org.apache.druid.query.spec.MultipleIntervalSegmentSpec;
 import org.apache.druid.query.spec.MultipleSpecificSegmentSpec;
 import org.apache.druid.query.spec.QuerySegmentSpec;
 import org.apache.druid.segment.TestHelper;
-import org.apache.druid.segment.join.NoopJoinableFactory;
+import org.apache.druid.segment.join.JoinableFactoryWrapperTest;
 import org.apache.druid.server.QueryScheduler;
 import org.apache.druid.server.coordination.ServerManagerTest;
 import org.apache.druid.server.coordination.ServerType;
+import org.apache.druid.server.metrics.NoopServiceEmitter;
 import org.apache.druid.timeline.DataSegment;
 import org.apache.druid.timeline.VersionedIntervalTimeline;
 import org.apache.druid.timeline.partition.LinearShardSpec;
@@ -138,7 +139,8 @@ public class CachingClusteredClientPerfTest
         Mockito.mock(DruidProcessingConfig.class),
         ForkJoinPool.commonPool(),
         queryScheduler,
-        NoopJoinableFactory.INSTANCE
+        JoinableFactoryWrapperTest.NOOP_JOINABLE_FACTORY_WRAPPER,
+        new NoopServiceEmitter()
     );
 
     Query<SegmentDescriptor> fakeQuery = makeFakeQuery(interval);

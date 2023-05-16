@@ -18,41 +18,42 @@
 
 import classNames from 'classnames';
 import React from 'react';
+import type { RowRenderProps } from 'react-table';
 import ReactTable from 'react-table';
 
 import { TableCell } from '../../../components';
+import type { DimensionSpec, MetricSpec } from '../../../druid-models';
 import {
-  DimensionSpec,
   getDimensionSpecName,
   getDimensionSpecType,
   getMetricSpecName,
   inflateDimensionSpec,
-  MetricSpec,
 } from '../../../druid-models';
+import {
+  DEFAULT_TABLE_CLASS_NAME,
+  STANDARD_TABLE_PAGE_SIZE,
+  STANDARD_TABLE_PAGE_SIZE_OPTIONS,
+} from '../../../react-table';
 import { caseInsensitiveContains, filterMap } from '../../../utils';
-import { HeaderAndRows, SampleEntry } from '../../../utils/sampler';
+import type { SampleEntry, SampleResponse } from '../../../utils/sampler';
+import { getHeaderNamesFromSampleResponse } from '../../../utils/sampler';
 
 import './schema-table.scss';
 
 export interface SchemaTableProps {
   sampleBundle: {
-    headerAndRows: HeaderAndRows;
+    sampleResponse: SampleResponse;
     dimensions: (string | DimensionSpec)[] | undefined;
     metricsSpec: MetricSpec[] | undefined;
+    definedDimensions: boolean;
   };
   columnFilter: string;
   selectedAutoDimension: string | undefined;
   selectedDimensionSpecIndex: number;
   selectedMetricSpecIndex: number;
   onAutoDimensionSelect: (dimensionName: string) => void;
-  onDimensionSelect: (
-    selectedDimensionSpec: DimensionSpec | undefined,
-    selectedDimensionSpecIndex: number,
-  ) => void;
-  onMetricSelect: (
-    selectedMetricSpec: MetricSpec | undefined,
-    selectedMetricSpecIndex: number,
-  ) => void;
+  onDimensionSelect: (dimensionSpec: DimensionSpec, index: number) => void;
+  onMetricSelect: (metricSpec: MetricSpec, index: number) => void;
 }
 
 export const SchemaTable = React.memo(function SchemaTable(props: SchemaTableProps) {
@@ -66,13 +67,17 @@ export const SchemaTable = React.memo(function SchemaTable(props: SchemaTablePro
     onDimensionSelect,
     onMetricSelect,
   } = props;
-  const { headerAndRows, dimensions, metricsSpec } = sampleBundle;
+  const { sampleResponse, dimensions, metricsSpec, definedDimensions } = sampleBundle;
 
   return (
     <ReactTable
-      className="schema-table -striped -highlight"
-      data={headerAndRows.rows}
-      columns={filterMap(headerAndRows.header, (columnName, i) => {
+      className={classNames('schema-table', DEFAULT_TABLE_CLASS_NAME)}
+      data={sampleResponse.data}
+      sortable={false}
+      defaultPageSize={STANDARD_TABLE_PAGE_SIZE}
+      pageSizeOptions={STANDARD_TABLE_PAGE_SIZE_OPTIONS}
+      showPagination={sampleResponse.data.length > STANDARD_TABLE_PAGE_SIZE}
+      columns={filterMap(getHeaderNamesFromSampleResponse(sampleResponse), (columnName, i) => {
         if (!caseInsensitiveContains(columnName, columnFilter)) return;
 
         const metricSpecIndex = metricsSpec
@@ -98,7 +103,8 @@ export const SchemaTable = React.memo(function SchemaTable(props: SchemaTablePro
             className: columnClassName,
             id: String(i),
             accessor: (row: SampleEntry) => (row.parsed ? row.parsed[columnName] : null),
-            Cell: function SchemaTableCell({ value }) {
+            width: 120,
+            Cell: function SchemaTableCell({ value }: RowRenderProps) {
               return <TableCell value={value} />;
             },
           };
@@ -126,7 +132,7 @@ export const SchemaTable = React.memo(function SchemaTable(props: SchemaTablePro
                 onClick={() => {
                   if (isTimestamp) return;
 
-                  if (dimensionSpec) {
+                  if (definedDimensions && dimensionSpec) {
                     onDimensionSelect(inflateDimensionSpec(dimensionSpec), dimensionSpecIndex);
                   } else {
                     onAutoDimensionSelect(columnName);
@@ -135,24 +141,21 @@ export const SchemaTable = React.memo(function SchemaTable(props: SchemaTablePro
               >
                 <div className="column-name">{columnName}</div>
                 <div className="column-detail">
-                  {isTimestamp ? 'long (time column)' : dimensionSpecType || 'string (auto)'}&nbsp;
+                  {isTimestamp ? 'long (time column)' : dimensionSpecType || '(auto)'}&nbsp;
                 </div>
               </div>
             ),
             headerClassName: columnClassName,
             className: columnClassName,
             id: String(i),
-            width: isTimestamp ? 200 : 100,
+            width: isTimestamp ? 200 : 140,
             accessor: (row: SampleEntry) => (row.parsed ? row.parsed[columnName] : null),
-            Cell: function SchemaTableCell(row) {
+            Cell: function SchemaTableCell(row: RowRenderProps) {
               return <TableCell value={isTimestamp ? new Date(row.value) : row.value} />;
             },
           };
         }
       })}
-      defaultPageSize={50}
-      showPagination={false}
-      sortable={false}
     />
   );
 });

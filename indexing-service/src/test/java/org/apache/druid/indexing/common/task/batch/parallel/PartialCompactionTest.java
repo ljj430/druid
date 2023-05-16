@@ -219,7 +219,8 @@ public class PartialCompactionTest extends AbstractMultiPhaseParallelIndexingTes
         partitionsSpec,
         2,
         expectedTaskState,
-        appendToExisting
+        appendToExisting,
+        false
     );
   }
 
@@ -227,7 +228,7 @@ public class PartialCompactionTest extends AbstractMultiPhaseParallelIndexingTes
   {
     return new Builder(
         DATASOURCE,
-        getSegmentLoaderFactory(),
+        getSegmentCacheManagerFactory(),
         RETRY_POLICY_FACTORY
     );
   }

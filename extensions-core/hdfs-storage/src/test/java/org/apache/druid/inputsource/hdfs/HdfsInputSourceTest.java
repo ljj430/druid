@@ -31,16 +31,19 @@ import org.apache.druid.data.input.InputRowSchema;
 import org.apache.druid.data.input.InputSource;
 import org.apache.druid.data.input.InputSourceReader;
 import org.apache.druid.data.input.InputSplit;
+import org.apache.druid.data.input.InputStats;
 import org.apache.druid.data.input.MaxSizeSplitHintSpec;
 import org.apache.druid.data.input.impl.CsvInputFormat;
 import org.apache.druid.data.input.impl.DimensionsSpec;
+import org.apache.druid.data.input.impl.InputStatsImpl;
 import org.apache.druid.data.input.impl.TimestampSpec;
 import org.apache.druid.java.util.common.parsers.CloseableIterator;
 import org.apache.druid.storage.hdfs.HdfsStorageDruidModule;
 import org.apache.druid.testing.InitializedNullHandlingTest;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -58,6 +61,7 @@ import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -159,6 +163,20 @@ public class HdfsInputSourceTest extends InitializedNullHandlingTest
                      .inputSourceConfig(DEFAULT_INPUT_SOURCE_CONFIG)
                      .build();
     }
+
+    @Test
+    public void testGetTypes()
+    {
+      final Configuration conf = new Configuration();
+      conf.set("fs.default.name", "hdfs://localhost:7020");
+      HdfsInputSource inputSource = HdfsInputSource.builder()
+                     .paths("/foo/bar*")
+                     .configuration(conf)
+                     .inputSourceConfig(DEFAULT_INPUT_SOURCE_CONFIG)
+                     .build();
+
+      Assert.assertEquals(Collections.singleton(HdfsInputSource.TYPE_KEY), inputSource.getTypes());
+    }
   }
 
   public static class SerializeDeserializeTest
@@ -246,7 +264,7 @@ public class HdfsInputSourceTest extends InitializedNullHandlingTest
 
   public static class ReaderTest
   {
-    private static final String PATH = "/test";
+    private static final String PATH = "test";
     private static final int NUM_FILE = 3;
     private static final String KEY_VALUE_SEPARATOR = ",";
     private static final String ALPHABET = "abcdefghijklmnopqrstuvwxyz";
@@ -254,60 +272,61 @@ public class HdfsInputSourceTest extends InitializedNullHandlingTest
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-    private MiniDFSCluster dfsCluster;
+    private FileSystem fileSystem;
     private HdfsInputSource target;
     private Set<Path> paths;
     private Map<Long, String> timestampToValue;
+    private List<String> fileContents;
 
     @Before
     public void setup() throws IOException
     {
       timestampToValue = new HashMap<>();
+      fileContents = new ArrayList<>();
 
       File dir = temporaryFolder.getRoot();
       Configuration configuration = new Configuration(true);
-      configuration.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, dir.getAbsolutePath());
-      dfsCluster = new MiniDFSCluster.Builder(configuration).build();
+      fileSystem = new LocalFileSystem();
+      fileSystem.initialize(dir.toURI(), configuration);
+      fileSystem.setWorkingDirectory(new Path(dir.getAbsolutePath()));
 
       paths = IntStream.range(0, NUM_FILE)
                        .mapToObj(
                            i -> {
                              char value = ALPHABET.charAt(i % ALPHABET.length());
                              timestampToValue.put((long) i, Character.toString(value));
-                             return createFile(
-                                 dfsCluster,
-                                 String.valueOf(i),
-                                 i + KEY_VALUE_SEPARATOR + value
-                             );
+
+                             final String contents = i + KEY_VALUE_SEPARATOR + value;
+                             fileContents.add(contents);
+                             return createFile(fileSystem, String.valueOf(i), contents);
                            }
                        )
                        .collect(Collectors.toSet());
 
       target = HdfsInputSource.builder()
-                              .paths(dfsCluster.getURI() + PATH + "*")
+                              .paths(fileSystem.makeQualified(new Path(PATH)) + "*")
                               .configuration(CONFIGURATION)
-                              .inputSourceConfig(DEFAULT_INPUT_SOURCE_CONFIG)
+                              .inputSourceConfig(new HdfsInputSourceConfig(ImmutableSet.of("hdfs", "file")))
                               .build();
     }
 
     @After
-    public void teardown()
+    public void teardown() throws IOException
     {
-      if (dfsCluster != null) {
-        dfsCluster.shutdown(true);
-      }
+      temporaryFolder.delete();
+      fileSystem.close();
     }
 
-    private static Path createFile(MiniDFSCluster dfsCluster, String pathSuffix, String contents)
+    private static Path createFile(FileSystem fs, String pathSuffix, String contents)
     {
       try {
         Path path = new Path(PATH + pathSuffix);
         try (Writer writer = new BufferedWriter(
-            new OutputStreamWriter(dfsCluster.getFileSystem().create(path), StandardCharsets.UTF_8)
+            new OutputStreamWriter(fs.create(path), StandardCharsets.UTF_8)
         )) {
           writer.write(contents);
         }
-        return path;
+        return fs.makeQualified(path);
       }
       catch (IOException e) {
         throw new UncheckedIOException(e);
@@ -318,9 +337,10 @@ public class HdfsInputSourceTest extends InitializedNullHandlingTest
     public void readsSplitsCorrectly() throws IOException
     {
       InputSourceReader reader = target.formattableReader(INPUT_ROW_SCHEMA, INPUT_FORMAT, null);
+      final InputStats inputStats = new InputStatsImpl();
 
       Map<Long, String> actualTimestampToValue = new HashMap<>();
-      try (CloseableIterator<InputRow> iterator = reader.read()) {
+      try (CloseableIterator<InputRow> iterator = reader.read(inputStats)) {
         while (iterator.hasNext()) {
           InputRow row = iterator.next();
           actualTimestampToValue.put(row.getTimestampFromEpoch(), row.getDimension(COLUMN).get(0));
@@ -328,6 +348,9 @@ public class HdfsInputSourceTest extends InitializedNullHandlingTest
       }
 
       Assert.assertEquals(timestampToValue, actualTimestampToValue);
+
+      long totalFileSize = fileContents.stream().mapToLong(String::length).sum();
+      Assert.assertEquals(totalFileSize, inputStats.getProcessedBytes());
     }
 
     @Test
@@ -339,7 +362,6 @@ public class HdfsInputSourceTest extends InitializedNullHandlingTest
       splits.forEach(split -> Assert.assertEquals(1, split.get().size()));
       Set<Path> actualPaths = splits.stream()
                                     .flatMap(split -> split.get().stream())
-                                    .map(Path::getPathWithoutSchemeAndAuthority)
                                     .collect(Collectors.toSet());
       Assert.assertEquals(paths, actualPaths);
     }
@@ -395,10 +417,12 @@ public class HdfsInputSourceTest extends InitializedNullHandlingTest
     public void readsSplitsCorrectly() throws IOException
     {
       InputSourceReader reader = target.formattableReader(INPUT_ROW_SCHEMA, INPUT_FORMAT, null);
+      final InputStats inputStats = new InputStatsImpl();
 
-      try (CloseableIterator<InputRow> iterator = reader.read()) {
+      try (CloseableIterator<InputRow> iterator = reader.read(inputStats)) {
         Assert.assertFalse(iterator.hasNext());
       }
+      Assert.assertEquals(0, inputStats.getProcessedBytes());
     }
 
     @Test

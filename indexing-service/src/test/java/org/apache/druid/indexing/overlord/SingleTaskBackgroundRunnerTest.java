@@ -20,10 +20,11 @@
 package org.apache.druid.indexing.overlord;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import org.apache.druid.client.indexing.NoopIndexingServiceClient;
+import org.apache.druid.client.indexing.NoopOverlordClient;
+import org.apache.druid.indexer.TaskLocation;
 import org.apache.druid.indexer.TaskState;
 import org.apache.druid.indexer.TaskStatus;
-import org.apache.druid.indexing.common.SegmentLoaderFactory;
+import org.apache.druid.indexing.common.SegmentCacheManagerFactory;
 import org.apache.druid.indexing.common.SingleFileTaskReportFileWriter;
 import org.apache.druid.indexing.common.TaskToolbox;
 import org.apache.druid.indexing.common.TaskToolboxFactory;
@@ -31,10 +32,13 @@ import org.apache.druid.indexing.common.TestUtils;
 import org.apache.druid.indexing.common.actions.TaskActionClient;
 import org.apache.druid.indexing.common.actions.TaskActionClientFactory;
 import org.apache.druid.indexing.common.config.TaskConfig;
+import org.apache.druid.indexing.common.config.TaskConfigBuilder;
 import org.apache.druid.indexing.common.task.AbstractTask;
 import org.apache.druid.indexing.common.task.NoopTask;
 import org.apache.druid.indexing.common.task.TestAppenderatorsManager;
 import org.apache.druid.java.util.common.Intervals;
+import org.apache.druid.java.util.common.concurrent.Execs;
+import org.apache.druid.java.util.emitter.EmittingLogger;
 import org.apache.druid.java.util.emitter.service.ServiceEmitter;
 import org.apache.druid.query.Druids;
 import org.apache.druid.query.QueryRunner;
@@ -61,12 +65,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class SingleTaskBackgroundRunnerTest
 {
@@ -80,20 +87,14 @@ public class SingleTaskBackgroundRunnerTest
   {
     final TestUtils utils = new TestUtils();
     final DruidNode node = new DruidNode("testServer", "testHost", false, 1000, null, true, false);
-    final TaskConfig taskConfig = new TaskConfig(
-        temporaryFolder.newFile().toString(),
-        null,
-        null,
-        50000,
-        null,
-        true,
-        null,
-        null,
-        null,
-        false,
-        false
-    );
+    final TaskConfig taskConfig = new TaskConfigBuilder()
+        .setBaseDir(temporaryFolder.newFile().toString())
+        .setDefaultRowFlushBoundary(50000)
+        .setRestoreTasksOnRestart(true)
+        .setBatchProcessingMode(TaskConfig.BATCH_PROCESSING_MODE_DEFAULT.name())
+        .build();
     final ServiceEmitter emitter = new NoopServiceEmitter();
+    EmittingLogger.registerEmitter(emitter);
     final TaskToolboxFactory toolboxFactory = new TaskToolboxFactory(
         taskConfig,
         null,
@@ -110,13 +111,13 @@ public class SingleTaskBackgroundRunnerTest
         null,
         NoopJoinableFactory.INSTANCE,
         null,
-        new SegmentLoaderFactory(null, utils.getTestObjectMapper()),
+        new SegmentCacheManagerFactory(utils.getTestObjectMapper()),
         utils.getTestObjectMapper(),
         utils.getTestIndexIO(),
         null,
         null,
         null,
-        utils.getTestIndexMergerV9(),
+        utils.getIndexMergerV9Factory(),
         null,
         node,
         null,
@@ -127,10 +128,12 @@ public class SingleTaskBackgroundRunnerTest
         new NoopChatHandlerProvider(),
         utils.getRowIngestionMetersFactory(),
         new TestAppenderatorsManager(),
-        new NoopIndexingServiceClient(),
+        new NoopOverlordClient(),
         null,
         null,
-        null
+        null,
+        null,
+        "1"
     );
     runner = new SingleTaskBackgroundRunner(
         toolboxFactory,
@@ -150,9 +153,24 @@ public class SingleTaskBackgroundRunnerTest
   @Test
   public void testRun() throws ExecutionException, InterruptedException
   {
+    NoopTask task = new NoopTask(null, null, null, 500L, 0, null, null, null)
+    {
+      @Nullable
+      @Override
+      public String setup(TaskToolbox toolbox)
+      {
+        return null;
+      }
+
+      @Override
+      public void cleanUp(TaskToolbox toolbox, TaskStatus taskStatus)
+      {
+        // do nothing
+      }
+    };
     Assert.assertEquals(
         TaskState.SUCCESS,
-        runner.run(new NoopTask(null, null, null, 500L, 0, null, null, null)).get().getStatusCode()
+        runner.run(task).get().getStatusCode()
     );
   }
 
@@ -163,10 +181,10 @@ public class SingleTaskBackgroundRunnerTest
 
     final QueryRunner<ScanResultValue> queryRunner =
         Druids.newScanQueryBuilder()
-              .dataSource("foo")
-              .intervals(new MultipleIntervalSegmentSpec(Intervals.ONLY_ETERNITY))
-              .build()
-              .getRunner(runner);
+            .dataSource("foo")
+            .intervals(new MultipleIntervalSegmentSpec(Intervals.ONLY_ETERNITY))
+            .build()
+            .getRunner(runner);
 
     Assert.assertThat(queryRunner, CoreMatchers.instanceOf(SetAndVerifyContextQueryRunner.class));
   }
@@ -199,6 +217,124 @@ public class SingleTaskBackgroundRunnerTest
     Assert.assertTrue(holder.get());
   }
 
+  @Test
+  public void testStopRestorableTaskExceptionAfterStop()
+  {
+    // statusChanged callback can be called by multiple threads.
+    AtomicReference<TaskStatus> statusHolder = new AtomicReference<>();
+    runner.registerListener(
+        new TaskRunnerListener()
+        {
+          @Override
+          public String getListenerId()
+          {
+            return "testStopRestorableTaskExceptionAfterStop";
+          }
+
+          @Override
+          public void locationChanged(String taskId, TaskLocation newLocation)
+          {
+            // do nothing
+          }
+
+          @Override
+          public void statusChanged(String taskId, TaskStatus status)
+          {
+            statusHolder.set(status);
+          }
+        },
+        Execs.directExecutor()
+    );
+    runner.run(
+        new RestorableTask(new BooleanHolder())
+        {
+          @Override
+          public TaskStatus runTask(TaskToolbox toolbox)
+          {
+            throw new Error("task failure test");
+          }
+
+          @Nullable
+          @Override
+          public String setup(TaskToolbox toolbox)
+          {
+            return null;
+          }
+
+          @Override
+          public void cleanUp(TaskToolbox toolbox, TaskStatus taskStatus)
+          {
+            // do nothing
+          }
+        }
+    );
+    runner.stop();
+    Assert.assertEquals(TaskState.FAILED, statusHolder.get().getStatusCode());
+    Assert.assertEquals(
+        "Failed to stop gracefully with exception. See task logs for more details.",
+        statusHolder.get().getErrorMsg()
+    );
+  }
+
+  @Test
+  public void testStopNonRestorableTask() throws InterruptedException
+  {
+    // latch to wait for SingleTaskBackgroundRunnerCallable to be executed before stopping the task
+    // We need this latch because TaskRunnerListener is currently racy.
+    // See https://github.com/apache/druid/issues/11445 for more details.
+    CountDownLatch runLatch = new CountDownLatch(1);
+    // statusChanged callback can be called by multiple threads.
+    AtomicReference<TaskStatus> statusHolder = new AtomicReference<>();
+    runner.registerListener(
+        new TaskRunnerListener()
+        {
+          @Override
+          public String getListenerId()
+          {
+            return "testStopNonRestorableTask";
+          }
+
+          @Override
+          public void locationChanged(String taskId, TaskLocation newLocation)
+          {
+            // do nothing
+          }
+
+          @Override
+          public void statusChanged(String taskId, TaskStatus status)
+          {
+            if (status.getStatusCode() == TaskState.RUNNING) {
+              runLatch.countDown();
+            } else {
+              statusHolder.set(status);
+            }
+          }
+        },
+        Execs.directExecutor()
+    );
+    runner.run(
+        new NoopTask(
+            null,
+            null,
+            "datasource",
+            10000, // 10 sec
+            0,
+            null,
+            null,
+            null
+        )
+    );
+
+    Assert.assertTrue(runLatch.await(1, TimeUnit.SECONDS));
+    runner.stop();
+
+    Assert.assertEquals(TaskState.FAILED, statusHolder.get().getStatusCode());
+    Assert.assertEquals(
+        "Canceled as task execution process stopped",
+        statusHolder.get().getErrorMsg()
+    );
+  }
+
   private static class RestorableTask extends AbstractTask
   {
     private final BooleanHolder gracefullyStopped;
@@ -223,7 +359,7 @@ public class SingleTaskBackgroundRunnerTest
     }
 
     @Override
-    public TaskStatus run(TaskToolbox toolbox)
+    public TaskStatus runTask(TaskToolbox toolbox)
     {
       return TaskStatus.success(getId());
     }
@@ -239,6 +375,21 @@ public class SingleTaskBackgroundRunnerTest
     {
       gracefullyStopped.set();
     }
+
+    @Nullable
+    @Override
+    public String setup(TaskToolbox toolbox)
+    {
+      return null;
+    }
+
+    @Override
+    public void cleanUp(TaskToolbox toolbox, TaskStatus taskStatus)
+    {
+      // do nothing
+    }
+
+
   }
 
   private static class BooleanHolder

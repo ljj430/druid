@@ -19,29 +19,29 @@
 
 package org.apache.druid.segment.realtime.appenderator;
 
-import com.google.common.collect.Ordering;
 import org.apache.druid.timeline.DataSegment;
+import org.apache.druid.timeline.SegmentTimeline;
 import org.apache.druid.timeline.TimelineObjectHolder;
-import org.apache.druid.timeline.VersionedIntervalTimeline;
 import org.apache.druid.timeline.partition.PartitionChunk;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class TestUsedSegmentChecker implements UsedSegmentChecker
 {
-  private final AppenderatorTester appenderatorTester;
+  private final List<DataSegment> pushedSegments;
 
-  public TestUsedSegmentChecker(AppenderatorTester appenderatorTester)
+  public TestUsedSegmentChecker(List<DataSegment> pushedSegments)
   {
-    this.appenderatorTester = appenderatorTester;
+    this.pushedSegments = pushedSegments;
   }
 
   @Override
   public Set<DataSegment> findUsedSegments(Set<SegmentIdWithShardSpec> identifiers)
   {
-    final VersionedIntervalTimeline<String, DataSegment> timeline = new VersionedIntervalTimeline<>(Ordering.natural());
-    VersionedIntervalTimeline.addSegments(timeline, appenderatorTester.getPushedSegments().iterator());
+    final SegmentTimeline timeline = new SegmentTimeline();
+    timeline.addSegments(pushedSegments.iterator());
 
     final Set<DataSegment> retVal = new HashSet<>();
     for (SegmentIdWithShardSpec identifier : identifiers) {

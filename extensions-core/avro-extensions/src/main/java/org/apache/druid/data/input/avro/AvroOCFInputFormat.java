@@ -21,6 +21,7 @@ package org.apache.druid.data.input.avro;
 
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.avro.Schema;
@@ -42,6 +43,9 @@ public class AvroOCFInputFormat extends NestedInputFormat
   private static final Logger LOGGER = new Logger(AvroOCFInputFormat.class);
 
   private final boolean binaryAsString;
+  private final boolean extractUnionsByType;
+  private final Map<String, Object> schema;
+
   @Nullable
   private final Schema readerSchema;
 
@@ -50,10 +54,12 @@ public class AvroOCFInputFormat extends NestedInputFormat
       @JacksonInject @Json ObjectMapper mapper,
       @JsonProperty("flattenSpec") @Nullable JSONPathSpec flattenSpec,
       @JsonProperty("schema") @Nullable Map<String, Object> schema,
-      @JsonProperty("binaryAsString") @Nullable Boolean binaryAsString
+      @JsonProperty("binaryAsString") @Nullable Boolean binaryAsString,
+      @JsonProperty("extractUnionsByType") @Nullable Boolean extractUnionsByType
   ) throws Exception
   {
     super(flattenSpec);
+    this.schema = schema;
     // If a reader schema is supplied create the datum reader with said schema, otherwise use the writer schema
     if (schema != null) {
       String schemaStr = mapper.writeValueAsString(schema);
@@ -62,7 +68,8 @@ public class AvroOCFInputFormat extends NestedInputFormat
     } else {
       this.readerSchema = null;
     }
-    this.binaryAsString = binaryAsString == null ? false : binaryAsString;
+    this.binaryAsString = binaryAsString != null && binaryAsString;
+    this.extractUnionsByType = extractUnionsByType != null && extractUnionsByType;
   }
 
   @Override
@@ -71,6 +78,28 @@ public class AvroOCFInputFormat extends NestedInputFormat
     // In the future Avro OCF files could be split, the format allows for efficient splitting
     // See https://avro.apache.org/docs/current/spec.html#Object+Container+Files for details
     return false;
+  }
+
+  @Nullable
+  @JsonProperty
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Map<String, Object> getSchema()
+  {
+    return schema;
+  }
+
+  @JsonProperty
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  public boolean getBinaryAsString()
+  {
+    return binaryAsString;
+  }
+
+  @JsonProperty
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  public Boolean isExtractUnionsByType()
+  {
+    return extractUnionsByType;
   }
 
   @Override
@@ -82,7 +111,8 @@ public class AvroOCFInputFormat extends NestedInputFormat
         temporaryDirectory,
         readerSchema,
         getFlattenSpec(),
-        binaryAsString
+        binaryAsString,
+        extractUnionsByType
     );
   }
 
@@ -99,13 +129,23 @@ public class AvroOCFInputFormat extends NestedInputFormat
       return false;
     }
     AvroOCFInputFormat that = (AvroOCFInputFormat) o;
-    return binaryAsString == that.binaryAsString &&
+    return binaryAsString == that.binaryAsString && extractUnionsByType == that.extractUnionsByType &&
            Objects.equals(readerSchema, that.readerSchema);
   }
 
   @Override
   public int hashCode()
   {
-    return Objects.hash(super.hashCode(), binaryAsString, readerSchema);
+    return Objects.hash(super.hashCode(), binaryAsString, readerSchema, extractUnionsByType);
+  }
+
+  @Override
+  public String toString()
+  {
+    return "AvroOCFInputFormat{" +
+           "binaryAsString=" + binaryAsString +
+           ", extractUnionsByType=" + extractUnionsByType +
+           ", readerSchema=" + readerSchema +
+           '}';
   }
 }

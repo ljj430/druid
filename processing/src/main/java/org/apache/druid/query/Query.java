@@ -25,11 +25,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 import org.apache.druid.guice.annotations.ExtensionPoint;
+import org.apache.druid.java.util.common.HumanReadableBytes;
 import org.apache.druid.java.util.common.granularity.Granularity;
 import org.apache.druid.query.datasourcemetadata.DataSourceMetadataQuery;
 import org.apache.druid.query.filter.DimFilter;
 import org.apache.druid.query.groupby.GroupByQuery;
 import org.apache.druid.query.metadata.metadata.SegmentMetadataQuery;
+import org.apache.druid.query.operator.WindowOperatorQuery;
 import org.apache.druid.query.scan.ScanQuery;
 import org.apache.druid.query.search.SearchQuery;
 import org.apache.druid.query.select.SelectQuery;
@@ -48,33 +50,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
 
 @ExtensionPoint
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "queryType")
 @JsonSubTypes(value = {
-    @JsonSubTypes.Type(name = Query.TIMESERIES, value = TimeseriesQuery.class),
-    @JsonSubTypes.Type(name = Query.SEARCH, value = SearchQuery.class),
-    @JsonSubTypes.Type(name = Query.TIME_BOUNDARY, value = TimeBoundaryQuery.class),
+    @JsonSubTypes.Type(name = Query.DATASOURCE_METADATA, value = DataSourceMetadataQuery.class),
     @JsonSubTypes.Type(name = Query.GROUP_BY, value = GroupByQuery.class),
     @JsonSubTypes.Type(name = Query.SCAN, value = ScanQuery.class),
+    @JsonSubTypes.Type(name = Query.SEARCH, value = SearchQuery.class),
     @JsonSubTypes.Type(name = Query.SEGMENT_METADATA, value = SegmentMetadataQuery.class),
     @JsonSubTypes.Type(name = Query.SELECT, value = SelectQuery.class),
+    @JsonSubTypes.Type(name = Query.TIME_BOUNDARY, value = TimeBoundaryQuery.class),
+    @JsonSubTypes.Type(name = Query.TIMESERIES, value = TimeseriesQuery.class),
     @JsonSubTypes.Type(name = Query.TOPN, value = TopNQuery.class),
-    @JsonSubTypes.Type(name = Query.DATASOURCE_METADATA, value = DataSourceMetadataQuery.class)
-
+    @JsonSubTypes.Type(name = Query.WINDOW_OPERATOR, value = WindowOperatorQuery.class),
 })
 public interface Query<T>
 {
-  String TIMESERIES = "timeseries";
-  String SEARCH = "search";
-  String TIME_BOUNDARY = "timeBoundary";
+  String DATASOURCE_METADATA = "dataSourceMetadata";
   String GROUP_BY = "groupBy";
   String SCAN = "scan";
+  String SEARCH = "search";
   String SEGMENT_METADATA = "segmentMetadata";
   String SELECT = "select";
+  String TIME_BOUNDARY = "timeBoundary";
+  String TIMESERIES = "timeseries";
   String TOPN = "topN";
-  String DATASOURCE_METADATA = "dataSourceMetadata";
+  String WINDOW_OPERATOR = "windowOperator";
 
   DataSource getDataSource();
 
@@ -96,20 +98,78 @@ public interface Query<T>
 
   DateTimeZone getTimezone();
 
+  /**
+   * Returns the context as an (immutable) map.
+   */
   Map<String, Object> getContext();
 
-  <ContextType> ContextType getContextValue(String key);
+  /**
+   * Returns the query context as a {@link QueryContext}, which provides
+   * convenience methods for accessing typed context values. The returned
+   * instance is a view on top of the context provided by {@link #getContext()}.
+   * <p>
+   * The default implementation is for backward compatibility. Derived classes should
+   * store and return the {@link QueryContext} directly.
+   */
+  default QueryContext context()
+  {
+    return QueryContext.of(getContext());
+  }
 
-  <ContextType> ContextType getContextValue(String key, ContextType defaultValue);
+  /**
+   * Get context value and cast to ContextType in an unsafe way.
+   *
+   * For safe conversion, it's recommended to use following methods instead:
+   * <p>
+   * {@link QueryContext#getBoolean(String)} <br/>
+   * {@link QueryContext#getString(String)} <br/>
+   * {@link QueryContext#getInt(String)} <br/>
+   * {@link QueryContext#getLong(String)} <br/>
+   * {@link QueryContext#getFloat(String)} <br/>
+   * {@link QueryContext#getEnum(String, Class, Enum)} <br/>
+   * {@link QueryContext#getHumanReadableBytes(String, HumanReadableBytes)}
+   *
+   * @deprecated use {@code queryContext().get<Type>()} instead
+   */
+  @Deprecated
+  @SuppressWarnings("unchecked")
+  @Nullable
+  default <ContextType> ContextType getContextValue(String key)
+  {
+    return (ContextType) context().get(key);
+  }
 
-  boolean getContextBoolean(String key, boolean defaultValue);
+  /**
+   * @deprecated use {@code queryContext().getBoolean()} instead.
+   */
+  @Deprecated
+  default boolean getContextBoolean(String key, boolean defaultValue)
+  {
+    return context().getBoolean(key, defaultValue);
+  }
+
+  /**
+   * Returns {@link HumanReadableBytes} for a specified context key. If the context is null or the key doesn't exist
+   * a caller specified default value is returned. A default implementation is provided since Query is an extension
+   * point. Extensions can choose to rely on this default to retain compatibility with core Druid.
+   *
+   * @param key          The context key value being looked up
+   * @param defaultValue The default to return if the key value doesn't exist or the context is null.
+   * @return {@link HumanReadableBytes}
+   * @deprecated use {@code queryContext().getContextHumanReadableBytes()} instead.
+   */
+  @Deprecated
+  default HumanReadableBytes getContextHumanReadableBytes(String key, HumanReadableBytes defaultValue)
+  {
+    return context().getHumanReadableBytes(key, defaultValue);
+  }
 
   boolean isDescending();
 
   /**
    * Comparator that represents the order in which results are generated from the
    * {@link QueryRunnerFactory#createRunner(Segment)} and
-   * {@link QueryRunnerFactory#mergeRunners(ExecutorService, Iterable)} calls. This is used to combine streams of
+   * {@link QueryRunnerFactory#mergeRunners(QueryProcessingPool, Iterable)} calls. This is used to combine streams of
    * results from different sources; for example, it's used by historicals to combine streams from different segments,
    * and it's used by the broker to combine streams from different historicals.
    *
@@ -139,6 +199,7 @@ public interface Query<T>
    */
   Query<T> withSubQueryId(String subQueryId);
 
+  @SuppressWarnings("unused")
   default Query<T> withDefaultSubQueryId()
   {
     return withSubQueryId(UUID.randomUUID().toString());
@@ -159,7 +220,7 @@ public interface Query<T>
   @Nullable
   default String getSqlQueryId()
   {
-    return null;
+    return context().getString(BaseQuery.SQL_QUERY_ID);
   }
 
   /**

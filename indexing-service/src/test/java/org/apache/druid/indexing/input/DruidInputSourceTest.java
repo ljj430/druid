@@ -23,11 +23,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.InjectableValues;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.druid.client.coordinator.CoordinatorClient;
+import org.apache.druid.data.input.ColumnsFilter;
+import org.apache.druid.data.input.InputRowSchema;
 import org.apache.druid.data.input.InputSource;
+import org.apache.druid.data.input.impl.DimensionsSpec;
+import org.apache.druid.data.input.impl.TimestampSpec;
 import org.apache.druid.guice.IndexingServiceInputSourceModule;
 import org.apache.druid.indexing.common.RetryPolicyFactory;
-import org.apache.druid.indexing.common.SegmentLoaderFactory;
+import org.apache.druid.indexing.common.SegmentCacheManagerFactory;
 import org.apache.druid.indexing.common.config.TaskConfig;
 import org.apache.druid.indexing.firehose.WindowedSegmentId;
 import org.apache.druid.java.util.common.Intervals;
@@ -35,17 +40,20 @@ import org.apache.druid.segment.IndexIO;
 import org.apache.druid.segment.TestHelper;
 import org.easymock.EasyMock;
 import org.hamcrest.CoreMatchers;
+import org.joda.time.Interval;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import java.util.Arrays;
+
 public class DruidInputSourceTest
 {
   private final IndexIO indexIO = EasyMock.createMock(IndexIO.class);
   private final CoordinatorClient coordinatorClient = EasyMock.createMock(CoordinatorClient.class);
-  private final SegmentLoaderFactory segmentLoaderFactory = EasyMock.createMock(SegmentLoaderFactory.class);
+  private final SegmentCacheManagerFactory segmentCacheManagerFactory = EasyMock.createMock(SegmentCacheManagerFactory.class);
   private final RetryPolicyFactory retryPolicyFactory = EasyMock.createMock(RetryPolicyFactory.class);
   private final TaskConfig taskConfig = EasyMock.createMock(TaskConfig.class);
 
@@ -63,7 +71,7 @@ public class DruidInputSourceTest
     final InjectableValues.Std injectableValues = (InjectableValues.Std) mapper.getInjectableValues();
     injectableValues.addValue(IndexIO.class, indexIO);
     injectableValues.addValue(CoordinatorClient.class, coordinatorClient);
-    injectableValues.addValue(SegmentLoaderFactory.class, segmentLoaderFactory);
+    injectableValues.addValue(SegmentCacheManagerFactory.class, segmentCacheManagerFactory);
     injectableValues.addValue(RetryPolicyFactory.class, retryPolicyFactory);
     injectableValues.addValue(TaskConfig.class, taskConfig);
   }
@@ -90,7 +98,7 @@ public class DruidInputSourceTest
             null,
             indexIO,
             coordinatorClient,
-            segmentLoaderFactory,
+            segmentCacheManagerFactory,
             retryPolicyFactory,
             taskConfig
         ),
@@ -124,7 +132,7 @@ public class DruidInputSourceTest
             ImmutableList.of("b"),
             indexIO,
             coordinatorClient,
-            segmentLoaderFactory,
+            segmentCacheManagerFactory,
             retryPolicyFactory,
             taskConfig
         ),
@@ -164,7 +172,7 @@ public class DruidInputSourceTest
             null,
             indexIO,
             coordinatorClient,
-            segmentLoaderFactory,
+            segmentCacheManagerFactory,
             retryPolicyFactory,
             taskConfig
         ),
@@ -220,5 +228,75 @@ public class DruidInputSourceTest
     expectedException.expectMessage("dataSource");
 
     mapper.readValue(json, InputSource.class);
+  }
+
+  @Test
+  public void testReaderColumnsFilterWithMetricGiven()
+  {
+    String datasource = "foo";
+    Interval interval = Intervals.of("2000/2001");
+    String column = "c1";
+    String metricName = "m1";
+    ColumnsFilter originalColumnsFilter = ColumnsFilter.inclusionBased(ImmutableSet.of(column));
+    InputRowSchema inputRowSchema = new InputRowSchema(
+        new TimestampSpec("timestamp", "auto", null),
+        new DimensionsSpec(
+            DimensionsSpec.getDefaultSchemas(Arrays.asList("timestamp", "a", "b"))
+        ),
+        originalColumnsFilter,
+        ImmutableSet.of(metricName)
+    );
+    DruidInputSource druidInputSource = new DruidInputSource(
+        datasource,
+        interval,
+        null,
+        null,
+        ImmutableList.of("a"),
+        ImmutableList.of("b"),
+        indexIO,
+        coordinatorClient,
+        segmentCacheManagerFactory,
+        retryPolicyFactory,
+        taskConfig
+    );
+    InputRowSchema inputSourceReader = druidInputSource.getInputRowSchemaToUse(inputRowSchema);
+    ColumnsFilter columnsFilter = inputSourceReader.getColumnsFilter();
+    Assert.assertTrue(columnsFilter.apply(column));
+    Assert.assertTrue(columnsFilter.apply(metricName));
+  }
+
+  @Test
+  public void testReaderColumnsFilterWithNoMetricGiven()
+  {
+    String datasource = "foo";
+    Interval interval = Intervals.of("2000/2001");
+    String column = "c1";
+    String metricName = "m1";
+    ColumnsFilter originalColumnsFilter = ColumnsFilter.inclusionBased(ImmutableSet.of(column));
+    InputRowSchema inputRowSchema = new InputRowSchema(
+        new TimestampSpec("timestamp", "auto", null),
+        new DimensionsSpec(
+            DimensionsSpec.getDefaultSchemas(Arrays.asList("timestamp", "a", "b"))
+        ),
+        originalColumnsFilter,
+        ImmutableSet.of()
+    );
+    DruidInputSource druidInputSource = new DruidInputSource(
+        datasource,
+        interval,
+        null,
+        null,
+        ImmutableList.of("a"),
+        ImmutableList.of("b"),
+        indexIO,
+        coordinatorClient,
+        segmentCacheManagerFactory,
+        retryPolicyFactory,
+        taskConfig
+    );
+    InputRowSchema inputSourceReader = druidInputSource.getInputRowSchemaToUse(inputRowSchema);
+    ColumnsFilter columnsFilter = inputSourceReader.getColumnsFilter();
+    Assert.assertTrue(columnsFilter.apply(column));
+    Assert.assertFalse(columnsFilter.apply(metricName));
   }
 }

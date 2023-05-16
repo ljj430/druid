@@ -29,16 +29,27 @@ import org.apache.druid.segment.realtime.plumber.NoopRejectionPolicyFactory;
 import org.apache.druid.server.coordination.DataSegmentAnnouncer;
 import org.easymock.EasyMock;
 import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class AppenderatorPlumberTest
 {
-  private final AppenderatorPlumber plumber;
-  private final AppenderatorTester appenderatorTester;
+  private AppenderatorPlumber plumber;
+  private StreamAppenderatorTester streamAppenderatorTester;
 
-  public AppenderatorPlumberTest() throws Exception
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+  @Before
+  public void setUp() throws Exception
   {
-    this.appenderatorTester = new AppenderatorTester(10);
+    this.streamAppenderatorTester =
+        new StreamAppenderatorTester.Builder()
+            .maxRowsInMemory(10)
+            .basePersistDirectory(temporaryFolder.newFolder())
+            .build();
     DataSegmentAnnouncer segmentAnnouncer = EasyMock
         .createMock(DataSegmentAnnouncer.class);
     segmentAnnouncer.announceSegment(EasyMock.anyObject());
@@ -60,7 +71,7 @@ public class AppenderatorPlumberTest
                 EasyMock.anyObject(),
                 EasyMock.anyObject(),
                 EasyMock.anyObject())).andReturn(true).anyTimes();
-    
+
     RealtimeTuningConfig tuningConfig = new RealtimeTuningConfig(
         null,
         1,
@@ -68,14 +79,13 @@ public class AppenderatorPlumberTest
         null,
         null,
         null,
-        null,
+        temporaryFolder.newFolder(),
         new IntervalStartVersioningPolicy(),
         new NoopRejectionPolicyFactory(),
         null,
         null,
         null,
         null,
-        true,
         0,
         0,
         false,
@@ -85,26 +95,26 @@ public class AppenderatorPlumberTest
         null
     );
 
-    this.plumber = new AppenderatorPlumber(appenderatorTester.getSchema(),
-        tuningConfig, appenderatorTester.getMetrics(),
-        segmentAnnouncer, segmentPublisher, handoffNotifier,
-        appenderatorTester.getAppenderator());
-
+    this.plumber = new AppenderatorPlumber(streamAppenderatorTester.getSchema(),
+                                           tuningConfig, streamAppenderatorTester.getMetrics(),
+                                           segmentAnnouncer, segmentPublisher, handoffNotifier,
+                                           streamAppenderatorTester.getAppenderator());
   }
 
   @Test
   public void testSimpleIngestion() throws Exception
   {
-    Appenderator appenderator = appenderatorTester.getAppenderator();
+    Appenderator appenderator = streamAppenderatorTester.getAppenderator();
 
     // startJob
     Assert.assertEquals(null, plumber.startJob());
 
     // getDataSource
-    Assert.assertEquals(AppenderatorTester.DATASOURCE, appenderator.getDataSource());
+    Assert.assertEquals(StreamAppenderatorTester.DATASOURCE, appenderator.getDataSource());
 
-    InputRow[] rows = new InputRow[] {AppenderatorTest.ir("2000", "foo", 1), 
-        AppenderatorTest.ir("2000", "bar", 2), AppenderatorTest.ir("2000", "qux", 4)};
+    InputRow[] rows = new InputRow[] {
+        StreamAppenderatorTest.ir("2000", "foo", 1),
+        StreamAppenderatorTest.ir("2000", "bar", 2), StreamAppenderatorTest.ir("2000", "qux", 4)};
     // add
     Assert.assertEquals(1, plumber.add(rows[0], null).getRowCount());
 

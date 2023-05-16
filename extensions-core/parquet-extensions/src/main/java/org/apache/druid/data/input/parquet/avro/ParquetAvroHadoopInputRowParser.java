@@ -32,6 +32,7 @@ import org.apache.druid.data.input.InputRow;
 import org.apache.druid.data.input.MapBasedInputRow;
 import org.apache.druid.data.input.avro.AvroFlattenerMaker;
 import org.apache.druid.data.input.avro.AvroParseSpec;
+import org.apache.druid.data.input.impl.DimensionsSpec;
 import org.apache.druid.data.input.impl.InputRowParser;
 import org.apache.druid.data.input.impl.ParseSpec;
 import org.apache.druid.data.input.impl.TimestampSpec;
@@ -51,6 +52,7 @@ public class ParquetAvroHadoopInputRowParser implements InputRowParser<GenericRe
 {
   private final ParseSpec parseSpec;
   private final boolean binaryAsString;
+  private final boolean extractUnionsByType;
   private final TimestampSpec timestampSpec;
   private final ObjectFlattener<GenericRecord> recordFlattener;
   private final List<String> dimensions;
@@ -58,13 +60,15 @@ public class ParquetAvroHadoopInputRowParser implements InputRowParser<GenericRe
   @JsonCreator
   public ParquetAvroHadoopInputRowParser(
       @JsonProperty("parseSpec") ParseSpec parseSpec,
-      @JsonProperty("binaryAsString") Boolean binaryAsString
+      @JsonProperty("binaryAsString") Boolean binaryAsString,
+      @JsonProperty("extractUnionsByType") Boolean extractUnionsByType
   )
   {
     this.parseSpec = parseSpec;
     this.timestampSpec = parseSpec.getTimestampSpec();
     this.dimensions = parseSpec.getDimensionsSpec().getDimensionNames();
-    this.binaryAsString = binaryAsString == null ? false : binaryAsString;
+    this.binaryAsString = binaryAsString != null && binaryAsString;
+    this.extractUnionsByType = extractUnionsByType != null && extractUnionsByType;
 
     final JSONPathSpec flattenSpec;
     if (parseSpec instanceof AvroParseSpec) {
@@ -73,9 +77,16 @@ public class ParquetAvroHadoopInputRowParser implements InputRowParser<GenericRe
       flattenSpec = JSONPathSpec.DEFAULT;
     }
 
+    final DimensionsSpec dimensionsSpec = parseSpec.getDimensionsSpec();
+
     this.recordFlattener = ObjectFlatteners.create(
         flattenSpec,
-        new AvroFlattenerMaker(false, this.binaryAsString)
+        new AvroFlattenerMaker(
+            false,
+            this.binaryAsString,
+            this.extractUnionsByType,
+            dimensionsSpec != null && dimensionsSpec.useSchemaDiscovery()
+        )
     );
   }
 
@@ -131,6 +142,6 @@ public class ParquetAvroHadoopInputRowParser implements InputRowParser<GenericRe
   @Override
   public InputRowParser withParseSpec(ParseSpec parseSpec)
   {
-    return new ParquetAvroHadoopInputRowParser(parseSpec, binaryAsString);
+    return new ParquetAvroHadoopInputRowParser(parseSpec, binaryAsString, extractUnionsByType);
   }
 }

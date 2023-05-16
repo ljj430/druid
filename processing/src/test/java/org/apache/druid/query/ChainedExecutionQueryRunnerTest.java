@@ -22,31 +22,39 @@ package org.apache.druid.query;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import org.apache.druid.java.util.common.concurrent.Execs;
 import org.apache.druid.java.util.common.guava.Sequence;
 import org.apache.druid.java.util.common.guava.Sequences;
 import org.apache.druid.java.util.common.lifecycle.Lifecycle;
 import org.apache.druid.query.aggregation.CountAggregatorFactory;
 import org.apache.druid.query.context.ResponseContext;
 import org.apache.druid.query.timeseries.TimeseriesQuery;
+import org.apache.druid.query.timeseries.TimeseriesResultValue;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 public class ChainedExecutionQueryRunnerTest
 {
@@ -112,10 +120,10 @@ public class ChainedExecutionQueryRunnerTest
     );
 
     ChainedExecutionQueryRunner chainedRunner = new ChainedExecutionQueryRunner<>(
-        exec,
+        new ForwardingQueryProcessingPool(exec),
         watcher,
         Lists.newArrayList(
-         runners
+            runners
         )
     );
     TimeseriesQuery query = Druids.newTimeseriesQueryBuilder()
@@ -125,7 +133,7 @@ public class ChainedExecutionQueryRunnerTest
                                   .build();
     final Sequence seq = chainedRunner.run(QueryPlus.wrap(query));
 
-    Future resultFuture = Executors.newFixedThreadPool(1).submit(
+    Future resultFuture = Execs.multiThreaded(1, "ChainedExecutionQueryRunnerTest-%d").submit(
         new Runnable()
         {
           @Override
@@ -236,7 +244,7 @@ public class ChainedExecutionQueryRunnerTest
     );
 
     ChainedExecutionQueryRunner chainedRunner = new ChainedExecutionQueryRunner<>(
-        exec,
+        new ForwardingQueryProcessingPool(exec),
         watcher,
         Lists.newArrayList(
             runners
@@ -250,7 +258,7 @@ public class ChainedExecutionQueryRunnerTest
                                   .build();
     final Sequence seq = chainedRunner.run(QueryPlus.wrap(query));
 
-    Future resultFuture = Executors.newFixedThreadPool(1).submit(
+    Future resultFuture = Execs.multiThreaded(1, "ChainedExecutionQueryRunnerTest-%d").submit(
         new Runnable()
         {
           @Override
@@ -304,6 +312,35 @@ public class ChainedExecutionQueryRunnerTest
     Assert.assertFalse("runner 3 not completed", remainingRunner.hasCompleted);
 
     EasyMock.verify(watcher);
+  }
+
+  @Test
+  public void testSubmittedTaskType()
+  {
+    QueryProcessingPool queryProcessingPool = Mockito.mock(QueryProcessingPool.class);
+    QueryWatcher watcher = EasyMock.createStrictMock(QueryWatcher.class);
+    TimeseriesQuery query = Druids.newTimeseriesQueryBuilder()
+        .dataSource("test")
+        .intervals("2014/2015")
+        .aggregators(Collections.singletonList(new CountAggregatorFactory("count")))
+        .context(ImmutableMap.of(QueryContexts.TIMEOUT_KEY, 100, "queryId", "test"))
+        .build();
+    List<QueryRunner<Result<TimeseriesResultValue>>> runners = Arrays.asList(
+        Mockito.mock(QueryRunner.class),
+        Mockito.mock(QueryRunner.class)
+    );
+    ChainedExecutionQueryRunner<Result<TimeseriesResultValue>> chainedRunner = new ChainedExecutionQueryRunner<>(
+        queryProcessingPool,
+        watcher,
+        runners
+    );
+
+    Mockito.when(queryProcessingPool.submitRunnerTask(ArgumentMatchers.any())).thenReturn(Futures.immediateFuture(Collections.singletonList(123)));
+    chainedRunner.run(QueryPlus.wrap(query)).toList();
+    ArgumentCaptor<PrioritizedQueryRunnerCallable> captor = ArgumentCaptor.forClass(PrioritizedQueryRunnerCallable.class);
+    Mockito.verify(queryProcessingPool, Mockito.times(2)).submitRunnerTask(captor.capture());
+    List<QueryRunner> actual = captor.getAllValues().stream().map(PrioritizedQueryRunnerCallable::getRunner).collect(Collectors.toList());
+    Assert.assertEquals(runners, actual);
   }
 
   private class DyingQueryRunner implements QueryRunner<Integer>

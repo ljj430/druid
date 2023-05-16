@@ -22,7 +22,6 @@ package org.apache.druid.server.coordinator.duty;
 import com.google.common.collect.Lists;
 import org.apache.druid.client.ImmutableDruidServer;
 import org.apache.druid.java.util.common.Pair;
-import org.apache.druid.java.util.common.StringUtils;
 import org.apache.druid.java.util.emitter.EmittingLogger;
 import org.apache.druid.server.coordinator.BalancerSegmentHolder;
 import org.apache.druid.server.coordinator.BalancerStrategy;
@@ -36,6 +35,7 @@ import org.apache.druid.timeline.DataSegment;
 import org.apache.druid.timeline.SegmentId;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -91,6 +91,7 @@ public class BalanceSegments implements CoordinatorDuty
   )
   {
 
+    log.info("Balancing segments in tier [%s]", tier);
     if (params.getUsedSegments().size() == 0) {
       log.info("Metadata segments are not available. Cannot balance.");
       // suppress emit zero stats
@@ -141,6 +142,8 @@ public class BalanceSegments implements CoordinatorDuty
     }
 
     final int maxSegmentsToMove = Math.min(params.getCoordinatorDynamicConfig().getMaxSegmentsToMove(), numSegments);
+
+    // Prioritize moving segments from decomissioning servers.
     int decommissioningMaxPercentOfMaxSegmentsToMove =
         params.getCoordinatorDynamicConfig().getDecommissioningMaxPercentOfMaxSegmentsToMove();
     int maxSegmentsToMoveFromDecommissioningNodes =
@@ -152,6 +155,7 @@ public class BalanceSegments implements CoordinatorDuty
     Pair<Integer, Integer> decommissioningResult =
         balanceServers(params, decommissioningServers, activeServers, maxSegmentsToMoveFromDecommissioningNodes);
 
+    // After moving segments from decomissioning servers, move the remaining segments from the rest of the servers.
     int maxGeneralSegmentsToMove = maxSegmentsToMove - decommissioningResult.lhs;
     log.info("Processing %d segments for balancing between active servers", maxGeneralSegmentsToMove);
     Pair<Integer, Integer> generalResult =
@@ -180,22 +184,46 @@ public class BalanceSegments implements CoordinatorDuty
       int maxSegmentsToMove
   )
   {
+    if (maxSegmentsToMove <= 0) {
+      log.debug("maxSegmentsToMove is 0; no balancing work can be performed.");
+      return new Pair<>(0, 0);
+    } else if (toMoveFrom.isEmpty()) {
+      log.debug("toMoveFrom is empty; no balancing work can be performed.");
+      return new Pair<>(0, 0);
+    } else if (toMoveTo.isEmpty()) {
+      log.debug("toMoveTo is empty; no balancing work can be peformed.");
+      return new Pair<>(0, 0);
+    }
+
     final BalancerStrategy strategy = params.getBalancerStrategy();
     final int maxIterations = 2 * maxSegmentsToMove;
     final int maxToLoad = params.getCoordinatorDynamicConfig().getMaxSegmentsInNodeLoadingQueue();
     int moved = 0, unmoved = 0;
 
-    //noinspection ForLoopThatDoesntUseLoopVariable
-    for (int iter = 0; (moved + unmoved) < maxSegmentsToMove; ++iter) {
-      final BalancerSegmentHolder segmentToMoveHolder = strategy.pickSegmentToMove(
+    Iterator<BalancerSegmentHolder> segmentsToMove;
+    // The pick method depends on if the operator has enabled batched segment sampling in the Coorinator dynamic config.
+    if (params.getCoordinatorDynamicConfig().useBatchedSegmentSampler()) {
+      segmentsToMove = strategy.pickSegmentsToMove(
+          toMoveFrom,
+          params.getBroadcastDatasources(),
+          maxSegmentsToMove
+      );
+    } else {
+      segmentsToMove = strategy.pickSegmentsToMove(
           toMoveFrom,
           params.getBroadcastDatasources(),
           params.getCoordinatorDynamicConfig().getPercentOfSegmentsToConsiderPerMove()
       );
-      if (segmentToMoveHolder == null) {
+    }
+
+    //noinspection ForLoopThatDoesntUseLoopVariable
+    for (int iter = 0; (moved + unmoved) < maxSegmentsToMove; ++iter) {
+      if (!segmentsToMove.hasNext()) {
         log.info("All servers to move segments from are empty, ending run.");
         break;
       }
+      final BalancerSegmentHolder segmentToMoveHolder = segmentsToMove.next();
+
       // DruidCoordinatorRuntimeParams.getUsedSegments originate from SegmentsMetadataManager, i. e. that's a set of segments
       // that *should* be loaded. segmentToMoveHolder.getSegment originates from ServerInventoryView,  i. e. that may be
       // any segment that happens to be loaded on some server, even if it is not used. (Coordinator closes such
@@ -264,26 +292,18 @@ public class BalanceSegments implements CoordinatorDuty
         new ServerHolder(toServer, toPeon).getAvailableSize() > segmentToMove.getSize()) {
       log.debug("Moving [%s] from [%s] to [%s]", segmentId, fromServer.getName(), toServer.getName());
 
-      LoadPeonCallback callback = null;
+      ConcurrentMap<SegmentId, BalancerSegmentHolder> movingSegments =
+          currentlyMovingSegments.get(toServer.getTier());
+      movingSegments.put(segmentId, segment);
+      final LoadPeonCallback callback = moveSuccess -> movingSegments.remove(segmentId);
       try {
-        ConcurrentMap<SegmentId, BalancerSegmentHolder> movingSegments =
-            currentlyMovingSegments.get(toServer.getTier());
-        movingSegments.put(segmentId, segment);
-        callback = () -> movingSegments.remove(segmentId);
-        coordinator.moveSegment(
-            params,
-            fromServer,
-            toServer,
-            segmentToMove,
-            callback
-        );
+        coordinator
+            .moveSegment(params, fromServer, toServer, segmentToMove, callback);
         return true;
       }
       catch (Exception e) {
-        log.makeAlert(e, StringUtils.format("[%s] : Moving exception", segmentId)).emit();
-        if (callback != null) {
-          callback.execute();
-        }
+        log.makeAlert(e, "[%s] : Moving exception", segmentId).emit();
+        callback.execute(false);
       }
     }
     return false;

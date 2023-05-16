@@ -25,7 +25,6 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.druid.client.cache.Cache;
 import org.apache.druid.client.cache.CacheConfig;
 import org.apache.druid.client.cache.CachePopulator;
-import org.apache.druid.guice.annotations.Processing;
 import org.apache.druid.guice.annotations.Smile;
 import org.apache.druid.java.util.common.guava.Accumulator;
 import org.apache.druid.java.util.common.guava.Sequence;
@@ -35,6 +34,8 @@ import org.apache.druid.java.util.common.logger.Logger;
 import org.apache.druid.java.util.emitter.service.ServiceEmitter;
 import org.apache.druid.query.Query;
 import org.apache.druid.query.QueryCapacityExceededException;
+import org.apache.druid.query.QueryContext;
+import org.apache.druid.query.QueryProcessingPool;
 import org.apache.druid.query.QueryRunner;
 import org.apache.druid.query.QueryRunnerFactory;
 import org.apache.druid.query.QueryRunnerFactoryConglomerate;
@@ -46,16 +47,13 @@ import org.apache.druid.query.ResourceLimitExceededException;
 import org.apache.druid.query.SegmentDescriptor;
 import org.apache.druid.segment.ReferenceCountingSegment;
 import org.apache.druid.segment.SegmentReference;
-import org.apache.druid.segment.join.JoinableFactory;
+import org.apache.druid.segment.join.JoinableFactoryWrapper;
 import org.apache.druid.server.SegmentManager;
 import org.apache.druid.server.initialization.ServerConfig;
 import org.apache.druid.timeline.VersionedIntervalTimeline;
 
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
@@ -64,8 +62,9 @@ import java.util.function.Function;
  *
  * - Missing segments. A segment can be missing during a query if a historical drops the segment
  *   after the broker issues the query to the historical. To mimic this situation, the historical
- *   with this server manager announces all segments assigned, but reports missing segments for the
- *   first 3 segments specified in the query. See ITQueryRetryTestOnMissingSegments.
+ *   with this server manager announces all segments assigned, but reports missing segment for the
+ *   first segment of the datasource specified in the query. The missing report is only generated once for the first
+ *   segment. Post that report, all segments are served for the datasource. See ITQueryRetryTestOnMissingSegments.
  * - Other query errors. This server manager returns a sequence that always throws an exception
  *   based on a given query context value. See ITQueryErrorTest.
  *
@@ -83,40 +82,40 @@ public class ServerManagerForQueryErrorTest extends ServerManager
   public static final String QUERY_FAILURE_TEST_CONTEXT_KEY = "query-failure-test";
 
   private static final Logger LOG = new Logger(ServerManagerForQueryErrorTest.class);
-  private static final int MAX_NUM_FALSE_MISSING_SEGMENTS_REPORTS = 3;
+  private static final int MAX_NUM_FALSE_MISSING_SEGMENTS_REPORTS = 1;
 
-  private final ConcurrentHashMap<String, Set<SegmentDescriptor>> queryToIgnoredSegments = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, Integer> queryToIgnoredSegments = new ConcurrentHashMap<>();
 
   @Inject
   public ServerManagerForQueryErrorTest(
       QueryRunnerFactoryConglomerate conglomerate,
       ServiceEmitter emitter,
-      @Processing ExecutorService exec,
+      QueryProcessingPool queryProcessingPool,
       CachePopulator cachePopulator,
       @Smile ObjectMapper objectMapper,
       Cache cache,
       CacheConfig cacheConfig,
       SegmentManager segmentManager,
-      JoinableFactory joinableFactory,
+      JoinableFactoryWrapper joinableFactoryWrapper,
       ServerConfig serverConfig
   )
   {
     super(
         conglomerate,
         emitter,
-        exec,
+        queryProcessingPool,
         cachePopulator,
         objectMapper,
         cache,
         cacheConfig,
         segmentManager,
-        joinableFactory,
+        joinableFactoryWrapper,
         serverConfig
     );
   }
 
   @Override
-  <T> QueryRunner<T> buildQueryRunnerForSegment(
+  protected <T> QueryRunner<T> buildQueryRunnerForSegment(
       Query<T> query,
       SegmentDescriptor descriptor,
       QueryRunnerFactory<T, Query<T>> factory,
@@ -127,19 +126,20 @@ public class ServerManagerForQueryErrorTest extends ServerManager
       Optional<byte[]> cacheKeyPrefix
   )
   {
-    if (query.getContextBoolean(QUERY_RETRY_TEST_CONTEXT_KEY, false)) {
+    final QueryContext queryContext = query.context();
+    if (queryContext.getBoolean(QUERY_RETRY_TEST_CONTEXT_KEY, false)) {
       final MutableBoolean isIgnoreSegment = new MutableBoolean(false);
       queryToIgnoredSegments.compute(
           query.getMostSpecificId(),
-          (queryId, ignoredSegments) -> {
-            if (ignoredSegments == null) {
-              ignoredSegments = new HashSet<>();
+          (queryId, ignoreCounter) -> {
+            if (ignoreCounter == null) {
+              ignoreCounter = 0;
             }
-            if (ignoredSegments.size() < MAX_NUM_FALSE_MISSING_SEGMENTS_REPORTS) {
-              ignoredSegments.add(descriptor);
+            if (ignoreCounter < MAX_NUM_FALSE_MISSING_SEGMENTS_REPORTS) {
+              ignoreCounter++;
               isIgnoreSegment.setTrue();
             }
-            return ignoredSegments;
+            return ignoreCounter;
           }
       );
 
@@ -147,7 +147,7 @@ public class ServerManagerForQueryErrorTest extends ServerManager
         LOG.info("Pretending I don't have segment[%s]", descriptor);
         return new ReportTimelineMissingSegmentQueryRunner<>(descriptor);
       }
-    } else if (query.getContextBoolean(QUERY_TIMEOUT_TEST_CONTEXT_KEY, false)) {
+    } else if (queryContext.getBoolean(QUERY_TIMEOUT_TEST_CONTEXT_KEY, false)) {
       return (queryPlus, responseContext) -> new Sequence<T>()
       {
         @Override
@@ -162,7 +162,7 @@ public class ServerManagerForQueryErrorTest extends ServerManager
           throw new QueryTimeoutException("query timeout test");
         }
       };
-    } else if (query.getContextBoolean(QUERY_CAPACITY_EXCEEDED_TEST_CONTEXT_KEY, false)) {
+    } else if (queryContext.getBoolean(QUERY_CAPACITY_EXCEEDED_TEST_CONTEXT_KEY, false)) {
       return (queryPlus, responseContext) -> new Sequence<T>()
       {
         @Override
@@ -177,7 +177,7 @@ public class ServerManagerForQueryErrorTest extends ServerManager
           throw QueryCapacityExceededException.withErrorMessageAndResolvedHost("query capacity exceeded test");
         }
       };
-    } else if (query.getContextBoolean(QUERY_UNSUPPORTED_TEST_CONTEXT_KEY, false)) {
+    } else if (queryContext.getBoolean(QUERY_UNSUPPORTED_TEST_CONTEXT_KEY, false)) {
       return (queryPlus, responseContext) -> new Sequence<T>()
       {
         @Override
@@ -192,7 +192,7 @@ public class ServerManagerForQueryErrorTest extends ServerManager
           throw new QueryUnsupportedException("query unsupported test");
         }
       };
-    } else if (query.getContextBoolean(RESOURCE_LIMIT_EXCEEDED_TEST_CONTEXT_KEY, false)) {
+    } else if (queryContext.getBoolean(RESOURCE_LIMIT_EXCEEDED_TEST_CONTEXT_KEY, false)) {
       return (queryPlus, responseContext) -> new Sequence<T>()
       {
         @Override
@@ -207,7 +207,7 @@ public class ServerManagerForQueryErrorTest extends ServerManager
           throw new ResourceLimitExceededException("resource limit exceeded test");
         }
       };
-    } else if (query.getContextBoolean(QUERY_FAILURE_TEST_CONTEXT_KEY, false)) {
+    } else if (queryContext.getBoolean(QUERY_FAILURE_TEST_CONTEXT_KEY, false)) {
       return (queryPlus, responseContext) -> new Sequence<T>()
       {
         @Override

@@ -24,7 +24,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.druid.indexing.common.task.Task;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+import java.util.concurrent.Future;
+
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = TaskAction.TYPE_FIELD)
 @JsonSubTypes(value = {
     @JsonSubTypes.Type(name = "lockAcquire", value = TimeChunkLockAcquireAction.class),
     @JsonSubTypes.Type(name = "lockTryAcquire", value = TimeChunkLockTryAcquireAction.class),
@@ -38,18 +40,35 @@ import org.apache.druid.indexing.common.task.Task;
     @JsonSubTypes.Type(name = "segmentListUsed", value = RetrieveUsedSegmentsAction.class),
     // Type name doesn't correspond to the name of the class for backward compatibility.
     @JsonSubTypes.Type(name = "segmentListUnused", value = RetrieveUnusedSegmentsAction.class),
+    @JsonSubTypes.Type(name = "markSegmentsAsUnused", value = MarkSegmentsAsUnusedAction.class),
     @JsonSubTypes.Type(name = "segmentNuke", value = SegmentNukeAction.class),
     @JsonSubTypes.Type(name = "segmentMetadataUpdate", value = SegmentMetadataUpdateAction.class),
     @JsonSubTypes.Type(name = SegmentAllocateAction.TYPE, value = SegmentAllocateAction.class),
     @JsonSubTypes.Type(name = "resetDataSourceMetadata", value = ResetDataSourceMetadataAction.class),
     @JsonSubTypes.Type(name = "checkPointDataSourceMetadata", value = CheckPointDataSourceMetadataAction.class),
-    @JsonSubTypes.Type(name = "surrogateAction", value = SurrogateAction.class)
+    @JsonSubTypes.Type(name = "surrogateAction", value = SurrogateAction.class),
+    @JsonSubTypes.Type(name = "updateStatus", value = UpdateStatusAction.class),
+    @JsonSubTypes.Type(name = "updateLocation", value = UpdateLocationAction.class)
 })
 public interface TaskAction<RetType>
 {
+  String TYPE_FIELD = "type";
+
   TypeReference<RetType> getReturnTypeReference(); // T_T
+
   RetType perform(Task task, TaskActionToolbox toolbox);
+
   boolean isAudited();
+
+  default boolean canPerformAsync(Task task, TaskActionToolbox toolbox)
+  {
+    return false;
+  }
+
+  default Future<RetType> performAsync(Task task, TaskActionToolbox toolbox)
+  {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
   String toString();

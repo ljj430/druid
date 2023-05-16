@@ -21,19 +21,19 @@ package org.apache.druid.query.groupby.epinephelinae.vector;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
-import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.memory.WritableMemory;
 import org.apache.druid.java.util.common.ISE;
 import org.apache.druid.java.util.common.guava.BaseSequence;
 import org.apache.druid.java.util.common.guava.Sequence;
 import org.apache.druid.java.util.common.io.Closer;
 import org.apache.druid.java.util.common.parsers.CloseableIterator;
-import org.apache.druid.query.QueryContexts;
+import org.apache.druid.query.DruidProcessingConfig;
 import org.apache.druid.query.aggregation.AggregatorAdapters;
 import org.apache.druid.query.dimension.DimensionSpec;
 import org.apache.druid.query.filter.Filter;
 import org.apache.druid.query.groupby.GroupByQuery;
 import org.apache.druid.query.groupby.GroupByQueryConfig;
+import org.apache.druid.query.groupby.GroupByQueryMetrics;
 import org.apache.druid.query.groupby.ResultRow;
 import org.apache.druid.query.groupby.epinephelinae.AggregateResult;
 import org.apache.druid.query.groupby.epinephelinae.BufferArrayGrouper;
@@ -41,7 +41,9 @@ import org.apache.druid.query.groupby.epinephelinae.CloseableGrouperIterator;
 import org.apache.druid.query.groupby.epinephelinae.GroupByQueryEngineV2;
 import org.apache.druid.query.groupby.epinephelinae.HashVectorGrouper;
 import org.apache.druid.query.groupby.epinephelinae.VectorGrouper;
+import org.apache.druid.query.groupby.epinephelinae.collection.MemoryPointer;
 import org.apache.druid.query.vector.VectorCursorGranularizer;
+import org.apache.druid.segment.ColumnInspector;
 import org.apache.druid.segment.ColumnProcessors;
 import org.apache.druid.segment.StorageAdapter;
 import org.apache.druid.segment.VirtualColumns;
@@ -53,13 +55,13 @@ import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
 import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class VectorGroupByEngine
@@ -75,18 +77,18 @@ public class VectorGroupByEngine
       @Nullable final Filter filter
   )
   {
-    Function<String, ColumnCapabilities> capabilitiesFunction = name ->
-        query.getVirtualColumns().getColumnCapabilitiesWithFallback(adapter, name);
+    final ColumnInspector inspector = query.getVirtualColumns().wrapInspector(adapter);
 
-    return canVectorizeDimensions(capabilitiesFunction, query.getDimensions())
-           && query.getDimensions().stream().allMatch(DimensionSpec::canVectorize)
-           && query.getAggregatorSpecs().stream().allMatch(aggregatorFactory -> aggregatorFactory.canVectorize(adapter))
+    return adapter.canVectorize(filter, query.getVirtualColumns(), false)
+           && canVectorizeDimensions(inspector, query.getDimensions())
            && VirtualColumns.shouldVectorize(query, query.getVirtualColumns(), adapter)
-           && adapter.canVectorize(filter, query.getVirtualColumns(), false);
+           && query.getAggregatorSpecs()
+                   .stream()
+                   .allMatch(aggregatorFactory -> aggregatorFactory.canVectorize(inspector));
   }
 
   public static boolean canVectorizeDimensions(
-      final Function<String, ColumnCapabilities> capabilitiesFunction,
+      final ColumnInspector inspector,
       final List<DimensionSpec> dimensions
   )
   {
@@ -94,6 +96,10 @@ public class VectorGroupByEngine
         .stream()
         .allMatch(
             dimension -> {
+              if (!dimension.canVectorize()) {
+                return false;
+              }
+
               if (dimension.mustDecorate()) {
                 // group by on multi value dimensions are not currently supported
                 // DimensionSpecs that decorate may turn singly-valued columns into multi-valued selectors.
@@ -101,8 +107,13 @@ public class VectorGroupByEngine
                 return false;
               }
 
+              if (dimension.getOutputType().isArray()) {
+                // group by on arrays is not currently supported in the vector processing engine
+                return false;
+              }
+
               // Now check column capabilities.
-              final ColumnCapabilities columnCapabilities = capabilitiesFunction.apply(dimension.getDimension());
+              final ColumnCapabilities columnCapabilities = inspector.getColumnCapabilities(dimension.getDimension());
               // null here currently means the column does not exist, nil columns can be vectorized
               if (columnCapabilities == null) {
                 return true;
@@ -119,7 +130,9 @@ public class VectorGroupByEngine
       @Nullable final DateTime fudgeTimestamp,
       @Nullable final Filter filter,
       final Interval interval,
-      final GroupByQueryConfig config
+      final GroupByQueryConfig config,
+      final DruidProcessingConfig processingConfig,
+      @Nullable final GroupByQueryMetrics groupByQueryMetrics
   )
   {
     if (!canVectorize(query, storageAdapter, filter)) {
@@ -137,8 +150,8 @@ public class VectorGroupByEngine
                 interval,
                 query.getVirtualColumns(),
                 false,
-                QueryContexts.getVectorSize(query),
-                null
+                query.context().getVectorSize(),
+                groupByQueryMetrics
             );
 
             if (cursor == null) {
@@ -179,6 +192,7 @@ public class VectorGroupByEngine
               return new VectorGroupByEngineIterator(
                   query,
                   config,
+                  processingConfig,
                   storageAdapter,
                   cursor,
                   interval,
@@ -217,6 +231,7 @@ public class VectorGroupByEngine
   {
     private final GroupByQuery query;
     private final GroupByQueryConfig querySpecificConfig;
+    private final DruidProcessingConfig processingConfig;
     private final StorageAdapter storageAdapter;
     private final VectorCursor cursor;
     private final List<GroupByVectorColumnSelector> selectors;
@@ -235,14 +250,20 @@ public class VectorGroupByEngine
     @Nullable
     private Interval bucketInterval;
 
+    // -1 if the current vector was fully aggregated after a call to "initNewDelegate". Otherwise, the number of
+    // rows of the current vector that were aggregated.
     private int partiallyAggregatedRows = -1;
 
+    // Sum of internal state footprint across all "selectors".
+    private long selectorInternalFootprint = 0;
+
     @Nullable
-    private CloseableGrouperIterator<Memory, ResultRow> delegate = null;
+    private CloseableGrouperIterator<MemoryPointer, ResultRow> delegate = null;
 
     VectorGroupByEngineIterator(
         final GroupByQuery query,
-        final GroupByQueryConfig config,
+        final GroupByQueryConfig querySpecificConfig,
+        final DruidProcessingConfig processingConfig,
         final StorageAdapter storageAdapter,
         final VectorCursor cursor,
         final Interval queryInterval,
@@ -252,7 +273,8 @@ public class VectorGroupByEngine
     )
     {
       this.query = query;
-      this.querySpecificConfig = config;
+      this.querySpecificConfig = querySpecificConfig;
+      this.processingConfig = processingConfig;
       this.storageAdapter = storageAdapter;
       this.cursor = cursor;
       this.selectors = selectors;
@@ -295,6 +317,8 @@ public class VectorGroupByEngine
             if (delegate != null) {
               delegate.close();
               vectorGrouper.reset();
+              selectors.forEach(GroupByVectorColumnSelector::reset);
+              selectorInternalFootprint = 0;
             }
 
             delegate = initNewDelegate();
@@ -358,7 +382,7 @@ public class VectorGroupByEngine
       return grouper;
     }
 
-    private CloseableGrouperIterator<Memory, ResultRow> initNewDelegate()
+    private CloseableGrouperIterator<MemoryPointer, ResultRow> initNewDelegate()
     {
       // Method must not be called unless there's a current bucketInterval.
       assert bucketInterval != null;
@@ -381,7 +405,11 @@ public class VectorGroupByEngine
           // Write keys to the keySpace.
           int keyOffset = 0;
           for (final GroupByVectorColumnSelector selector : selectors) {
-            selector.writeKeys(keySpace, keySize, keyOffset, startOffset, granulizer.getEndOffset());
+            // Update selectorInternalFootprint now, but check it later. (We reset on the first vector that causes us
+            // to go past the limit.)
+            selectorInternalFootprint +=
+                selector.writeKeys(keySpace, keySize, keyOffset, startOffset, granulizer.getEndOffset());
+
             keyOffset += selector.getGroupingKeySize();
           }
 
@@ -410,6 +438,8 @@ public class VectorGroupByEngine
         } else if (!granulizer.advanceCursorWithinBucket()) {
           // Advance bucketInterval.
           bucketInterval = bucketIterator.hasNext() ? bucketIterator.next() : null;
+          break;
+        } else if (selectorInternalFootprint > querySpecificConfig.getActualMaxSelectorDictionarySize(processingConfig)) {
           break;
         }
       }

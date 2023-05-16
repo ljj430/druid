@@ -19,22 +19,243 @@
 
 package org.apache.druid.data.input.avro;
 
+import com.google.common.collect.ImmutableSet;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.util.Utf8;
 import org.apache.druid.data.input.AvroStreamInputRowParserTest;
 import org.apache.druid.data.input.SomeAvroDatum;
+import org.apache.druid.data.input.UnionSubEnum;
+import org.apache.druid.data.input.UnionSubFixed;
+import org.apache.druid.data.input.UnionSubRecord;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AvroFlattenerMakerTest
 {
+  private static final AvroFlattenerMaker FLATTENER_WITHOUT_EXTRACT_UNION_BY_TYPE =
+      new AvroFlattenerMaker(false, false, false, false);
+  private static final AvroFlattenerMaker FLATTENER_WITH_EXTRACT_UNION_BY_TYPE =
+      new AvroFlattenerMaker(false, false, true, false);
+
+  private static final SomeAvroDatum RECORD = AvroStreamInputRowParserTest.buildSomeAvroDatum();
 
   @Test
-  public void getRootField()
+  public void getRootField_flattenerWithoutExtractUnionsByType()
   {
-    final SomeAvroDatum record = AvroStreamInputRowParserTest.buildSomeAvroDatum();
-    final AvroFlattenerMaker flattener = new AvroFlattenerMaker(false, false);
+    getRootField_common(RECORD, FLATTENER_WITHOUT_EXTRACT_UNION_BY_TYPE);
+  }
 
+  @Test
+  public void getRootField_flattenerWithExtractUnionsByType()
+  {
+    getRootField_common(RECORD, FLATTENER_WITH_EXTRACT_UNION_BY_TYPE);
+  }
+
+  @Test
+  public void makeJsonPathExtractor_flattenerWithoutExtractUnionsByType()
+  {
+    makeJsonPathExtractor_common(RECORD, FLATTENER_WITHOUT_EXTRACT_UNION_BY_TYPE);
+  }
+
+  @Test
+  public void makeJsonPathExtractor_flattenerWithExtractUnionsByType()
+  {
+    makeJsonPathExtractor_common(RECORD, FLATTENER_WITH_EXTRACT_UNION_BY_TYPE);
+    Assert.assertEquals(
+        RECORD.getSomeMultiMemberUnion(),
+        FLATTENER_WITH_EXTRACT_UNION_BY_TYPE.makeJsonPathExtractor("$.someMultiMemberUnion.int").apply(RECORD)
+    );
+  }
+
+  @Test
+  public void jsonPathExtractorExtractUnionsByType()
+  {
+    final AvroFlattenerMaker flattener = new AvroFlattenerMaker(false, false, true, false);
+
+    // Unmamed types are accessed by type
+
+    // int
+    Assert.assertEquals(1, flattener.makeJsonPathExtractor("$.someMultiMemberUnion.int").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(1)));
+
+    // long
+    Assert.assertEquals(1L, flattener.makeJsonPathExtractor("$.someMultiMemberUnion.long").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(1L)));
+
+    // float
+    Assert.assertEquals((float) 1.0, flattener.makeJsonPathExtractor("$.someMultiMemberUnion.float").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue((float) 1.0)));
+
+    // double
+    Assert.assertEquals(1.0, flattener.makeJsonPathExtractor("$.someMultiMemberUnion.double").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(1.0)));
+
+    // string
+    Assert.assertEquals("string", flattener.makeJsonPathExtractor("$.someMultiMemberUnion.string").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(new Utf8("string"))));
+
+    // bytes
+    Assert.assertArrayEquals(new byte[] {1}, (byte[]) flattener.makeJsonPathExtractor("$.someMultiMemberUnion.bytes").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(ByteBuffer.wrap(new byte[] {1}))));
+
+    // map
+    Assert.assertEquals(2, flattener.makeJsonPathExtractor("$.someMultiMemberUnion.map.two").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(new HashMap<String, Integer>() {{
+            put("one", 1);
+            put("two", 2);
+            put("three", 3);
+          }
+        }
+        )));
+
+    // array
+    Assert.assertEquals(3, flattener.makeJsonPathExtractor("$.someMultiMemberUnion.array[2]").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(Arrays.asList(1, 2, 3))));
+
+    // Named types are accessed by name
+
+    // record
+    Assert.assertEquals("subRecordString", flattener.makeJsonPathExtractor("$.someMultiMemberUnion.UnionSubRecord.subString").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(
+            UnionSubRecord.newBuilder()
+                          .setSubString("subRecordString")
+                          .build())));
+
+    // fixed
+    final byte[] fixedBytes = new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    Assert.assertEquals(fixedBytes, flattener.makeJsonPathExtractor("$.someMultiMemberUnion.UnionSubFixed").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(new UnionSubFixed(fixedBytes))));
+
+    // enum
+    Assert.assertEquals(String.valueOf(UnionSubEnum.ENUM1), flattener.makeJsonPathExtractor("$.someMultiMemberUnion.UnionSubEnum").apply(
+        AvroStreamInputRowParserTest.buildSomeAvroDatumWithUnionValue(UnionSubEnum.ENUM1)));
+  }
+
+  @Test(expected = UnsupportedOperationException.class)
+  public void makeJsonQueryExtractor_flattenerWithoutExtractUnionsByType()
+  {
+    Assert.assertEquals(
+        RECORD.getTimestamp(),
+        FLATTENER_WITHOUT_EXTRACT_UNION_BY_TYPE.makeJsonQueryExtractor("$.timestamp").apply(RECORD)
+    );
+  }
+
+  @Test(expected = UnsupportedOperationException.class)
+  public void makeJsonQueryExtractor_flattenerWithExtractUnionsByType()
+  {
+    Assert.assertEquals(
+        RECORD.getTimestamp(),
+        FLATTENER_WITH_EXTRACT_UNION_BY_TYPE.makeJsonQueryExtractor("$.timestamp").apply(RECORD)
+    );
+  }
+
+  @Test
+  public void testDiscovery()
+  {
+    final AvroFlattenerMaker flattener = new AvroFlattenerMaker(false, false, true, false);
+    final AvroFlattenerMaker flattenerNested = new AvroFlattenerMaker(false, false, true, true);
+
+    SomeAvroDatum input = AvroStreamInputRowParserTest.buildSomeAvroDatum();
+    // isFieldPrimitive on someStringArray is false
+    // as it contains items as nulls and strings
+    // so flattenerNested should only be able to discover it
+    Assert.assertEquals(
+        ImmutableSet.of(
+            "someOtherId",
+            "someIntArray",
+            "someFloat",
+            "eventType",
+            "someFixed",
+            "someBytes",
+            "someUnion",
+            "id",
+            "someEnum",
+            "someLong",
+            "someInt",
+            "timestamp"
+        ),
+        ImmutableSet.copyOf(flattener.discoverRootFields(input))
+    );
+    Assert.assertEquals(
+        ImmutableSet.of(
+            "someStringValueMap",
+            "someOtherId",
+            "someStringArray",
+            "someIntArray",
+            "someFloat",
+            "isValid",
+            "someIntValueMap",
+            "eventType",
+            "someFixed",
+            "someBytes",
+            "someRecord",
+            "someMultiMemberUnion",
+            "someNull",
+            "someRecordArray",
+            "someUnion",
+            "id",
+            "someEnum",
+            "someLong",
+            "someInt",
+            "timestamp"
+        ),
+        ImmutableSet.copyOf(flattenerNested.discoverRootFields(input))
+    );
+  }
+
+
+  @Test
+  public void testNullsInStringArray()
+  {
+    final AvroFlattenerMaker flattenerNested = new AvroFlattenerMaker(false, false, true, true);
+
+    SomeAvroDatum input = AvroStreamInputRowParserTest.buildSomeAvroDatum();
+
+    Assert.assertEquals(
+        ImmutableSet.of(
+            "someStringValueMap",
+            "someOtherId",
+            "someStringArray",
+            "someIntArray",
+            "someFloat",
+            "isValid",
+            "someIntValueMap",
+            "eventType",
+            "someFixed",
+            "someBytes",
+            "someRecord",
+            "someMultiMemberUnion",
+            "someNull",
+            "someRecordArray",
+            "someUnion",
+            "id",
+            "someEnum",
+            "someLong",
+            "someInt",
+            "timestamp"
+        ),
+        ImmutableSet.copyOf(flattenerNested.discoverRootFields(input))
+    );
+
+    ArrayList<Object> results = (ArrayList<Object>) flattenerNested.getRootField(input, "someStringArray");
+    // 4 strings a 1 null for a total of 5
+    Assert.assertEquals("8", results.get(0).toString());
+    Assert.assertEquals("4", results.get(1).toString());
+    Assert.assertEquals("2", results.get(2).toString());
+    Assert.assertEquals("1", results.get(3).toString());
+    Assert.assertEquals(null, results.get(4));
+  }
+
+  private void getRootField_common(final SomeAvroDatum record, final AvroFlattenerMaker flattener)
+  {
     Assert.assertEquals(
         record.getTimestamp(),
         flattener.getRootField(record, "timestamp")
@@ -94,8 +315,13 @@ public class AvroFlattenerMakerTest
         record.getSomeEnum().toString(),
         flattener.getRootField(record, "someEnum")
     );
+    Map<String, Object> map = new HashMap<>();
+    record.getSomeRecord()
+          .getSchema()
+          .getFields()
+          .forEach(field -> map.put(field.name(), record.getSomeRecord().get(field.name())));
     Assert.assertEquals(
-        record.getSomeRecord(),
+        map,
         flattener.getRootField(record, "someRecord")
     );
     Assert.assertEquals(
@@ -110,18 +336,23 @@ public class AvroFlattenerMakerTest
         record.getSomeFloat(),
         flattener.getRootField(record, "someFloat")
     );
+    List<Map<String, Object>> list = new ArrayList<>();
+    for (GenericRecord genericRecord : record.getSomeRecordArray()) {
+      Map<String, Object> map1 = new HashMap<>();
+      genericRecord
+          .getSchema()
+          .getFields()
+          .forEach(field -> map1.put(field.name(), genericRecord.get(field.name())));
+      list.add(map1);
+    }
     Assert.assertEquals(
-        record.getSomeRecordArray(),
+        list,
         flattener.getRootField(record, "someRecordArray")
     );
   }
 
-  @Test
-  public void makeJsonPathExtractor()
+  private void makeJsonPathExtractor_common(final SomeAvroDatum record, final AvroFlattenerMaker flattener)
   {
-    final SomeAvroDatum record = AvroStreamInputRowParserTest.buildSomeAvroDatum();
-    final AvroFlattenerMaker flattener = new AvroFlattenerMaker(false, false);
-
     Assert.assertEquals(
         record.getTimestamp(),
         flattener.makeJsonPathExtractor("$.timestamp").apply(record)
@@ -145,6 +376,37 @@ public class AvroFlattenerMakerTest
     Assert.assertEquals(
         record.getSomeIntArray(),
         flattener.makeJsonPathExtractor("$.someIntArray").apply(record)
+    );
+    Assert.assertEquals(
+        (double) record.getSomeIntArray().stream().mapToInt(Integer::intValue).min().getAsInt(),
+
+        //return type of min is double
+        flattener.makeJsonPathExtractor("$.someIntArray.min()").apply(record)
+    );
+    Assert.assertEquals(
+        (double) record.getSomeIntArray().stream().mapToInt(Integer::intValue).max().getAsInt(),
+
+        //return type of max is double
+        flattener.makeJsonPathExtractor("$.someIntArray.max()").apply(record)
+    );
+    Assert.assertEquals(
+        record.getSomeIntArray().stream().mapToInt(Integer::intValue).average().getAsDouble(),
+        flattener.makeJsonPathExtractor("$.someIntArray.avg()").apply(record)
+    );
+    Assert.assertEquals(
+        record.getSomeIntArray().size(),
+        flattener.makeJsonPathExtractor("$.someIntArray.length()").apply(record)
+    );
+    Assert.assertEquals(
+        (double) record.getSomeIntArray().stream().mapToInt(Integer::intValue).sum(),
+
+        //return type of sum is double
+        flattener.makeJsonPathExtractor("$.someIntArray.sum()").apply(record)
+    );
+    Assert.assertEquals(
+        2.681,
+        (double) flattener.makeJsonPathExtractor("$.someIntArray.stddev()").apply(record),
+        0.0001
     );
     Assert.assertEquals(
         record.getSomeStringArray(),
@@ -181,8 +443,13 @@ public class AvroFlattenerMakerTest
         record.getSomeEnum().toString(),
         flattener.makeJsonPathExtractor("$.someEnum").apply(record)
     );
+    Map<String, Object> map = new HashMap<>();
+    record.getSomeRecord()
+          .getSchema()
+          .getFields()
+          .forEach(field -> map.put(field.name(), record.getSomeRecord().get(field.name())));
     Assert.assertEquals(
-        record.getSomeRecord(),
+        map,
         flattener.makeJsonPathExtractor("$.someRecord").apply(record)
     );
     Assert.assertEquals(
@@ -197,8 +464,19 @@ public class AvroFlattenerMakerTest
         record.getSomeFloat(),
         flattener.makeJsonPathExtractor("$.someFloat").apply(record)
     );
+
+    List<Map<String, Object>> list = new ArrayList<>();
+    for (GenericRecord genericRecord : record.getSomeRecordArray()) {
+      Map<String, Object> map1 = new HashMap<>();
+      genericRecord
+          .getSchema()
+          .getFields()
+          .forEach(field -> map1.put(field.name(), genericRecord.get(field.name())));
+      list.add(map1);
+    }
+
     Assert.assertEquals(
-        record.getSomeRecordArray(),
+        list,
         flattener.makeJsonPathExtractor("$.someRecordArray").apply(record)
     );
 
@@ -208,7 +486,7 @@ public class AvroFlattenerMakerTest
     );
 
     Assert.assertEquals(
-        record.getSomeRecordArray(),
+        list,
         flattener.makeJsonPathExtractor("$.someRecordArray[?(@.nestedString)]").apply(record)
     );
 
@@ -216,18 +494,6 @@ public class AvroFlattenerMakerTest
     Assert.assertEquals(
         nestedStringArray,
         flattener.makeJsonPathExtractor("$.someRecordArray[?(@.nestedString=='string in record')].nestedString").apply(record)
-    );
-  }
-
-  @Test(expected = UnsupportedOperationException.class)
-  public void makeJsonQueryExtractor()
-  {
-    final SomeAvroDatum record = AvroStreamInputRowParserTest.buildSomeAvroDatum();
-    final AvroFlattenerMaker flattener = new AvroFlattenerMaker(false, false);
-
-    Assert.assertEquals(
-        record.getTimestamp(),
-        flattener.makeJsonQueryExtractor("$.timestamp").apply(record)
     );
   }
 }

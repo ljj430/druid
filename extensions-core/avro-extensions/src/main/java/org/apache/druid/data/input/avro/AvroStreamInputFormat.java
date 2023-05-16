@@ -25,6 +25,7 @@ import org.apache.druid.data.input.InputEntity;
 import org.apache.druid.data.input.InputEntityReader;
 import org.apache.druid.data.input.InputRowSchema;
 import org.apache.druid.data.input.impl.NestedInputFormat;
+import org.apache.druid.java.util.common.IAE;
 import org.apache.druid.java.util.common.parsers.JSONPathSpec;
 
 import javax.annotation.Nullable;
@@ -35,6 +36,7 @@ import java.util.Objects;
 public class AvroStreamInputFormat extends NestedInputFormat
 {
   private final boolean binaryAsString;
+  private final boolean extractUnionsByType;
 
   private final AvroBytesDecoder avroBytesDecoder;
 
@@ -42,12 +44,17 @@ public class AvroStreamInputFormat extends NestedInputFormat
   public AvroStreamInputFormat(
       @JsonProperty("flattenSpec") @Nullable JSONPathSpec flattenSpec,
       @JsonProperty("avroBytesDecoder") AvroBytesDecoder avroBytesDecoder,
-      @JsonProperty("binaryAsString") @Nullable Boolean binaryAsString
+      @JsonProperty("binaryAsString") @Nullable Boolean binaryAsString,
+      @JsonProperty("extractUnionsByType") @Nullable Boolean extractUnionsByType
   )
   {
     super(flattenSpec);
+    if (avroBytesDecoder == null) {
+      throw new IAE("avroBytesDecoder is required to decode Avro records");
+    }
     this.avroBytesDecoder = avroBytesDecoder;
-    this.binaryAsString = binaryAsString == null ? false : binaryAsString;
+    this.binaryAsString = binaryAsString != null && binaryAsString;
+    this.extractUnionsByType = extractUnionsByType != null && extractUnionsByType;
   }
 
   @Override
@@ -68,6 +75,12 @@ public class AvroStreamInputFormat extends NestedInputFormat
     return binaryAsString;
   }
 
+  @JsonProperty
+  public Boolean isExtractUnionsByType()
+  {
+    return extractUnionsByType;
+  }
+
   @Override
   public InputEntityReader createReader(InputRowSchema inputRowSchema, InputEntity source, File temporaryDirectory)
   {
@@ -76,7 +89,8 @@ public class AvroStreamInputFormat extends NestedInputFormat
         source,
         avroBytesDecoder,
         getFlattenSpec(),
-        binaryAsString
+        binaryAsString,
+        extractUnionsByType
     );
   }
 
@@ -91,13 +105,14 @@ public class AvroStreamInputFormat extends NestedInputFormat
     }
     final AvroStreamInputFormat that = (AvroStreamInputFormat) o;
     return Objects.equals(getFlattenSpec(), that.getFlattenSpec()) &&
-        Objects.equals(avroBytesDecoder, that.avroBytesDecoder) &&
-        Objects.equals(binaryAsString, that.binaryAsString);
+           Objects.equals(avroBytesDecoder, that.avroBytesDecoder) &&
+           Objects.equals(binaryAsString, that.binaryAsString) &&
+           Objects.equals(extractUnionsByType, that.extractUnionsByType);
   }
 
   @Override
   public int hashCode()
   {
-    return Objects.hash(getFlattenSpec(), avroBytesDecoder, binaryAsString);
+    return Objects.hash(getFlattenSpec(), avroBytesDecoder, binaryAsString, extractUnionsByType);
   }
 }

@@ -20,26 +20,34 @@
 package org.apache.druid.indexing.common.task;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableSet;
 import org.apache.druid.client.indexing.ClientKillUnusedSegmentsTaskQuery;
 import org.apache.druid.indexer.TaskStatus;
 import org.apache.druid.indexing.common.TaskLock;
 import org.apache.druid.indexing.common.TaskToolbox;
+import org.apache.druid.indexing.common.actions.MarkSegmentsAsUnusedAction;
 import org.apache.druid.indexing.common.actions.RetrieveUnusedSegmentsAction;
 import org.apache.druid.indexing.common.actions.SegmentNukeAction;
 import org.apache.druid.indexing.common.actions.TaskActionClient;
 import org.apache.druid.indexing.common.actions.TaskLocks;
 import org.apache.druid.java.util.common.ISE;
+import org.apache.druid.java.util.common.logger.Logger;
+import org.apache.druid.server.security.ResourceAction;
 import org.apache.druid.timeline.DataSegment;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -50,13 +58,17 @@ import java.util.stream.Collectors;
  */
 public class KillUnusedSegmentsTask extends AbstractFixedIntervalTask
 {
+  private static final Logger LOG = new Logger(KillUnusedSegmentsTask.class);
+
+  private final boolean markAsUnused;
 
   @JsonCreator
   public KillUnusedSegmentsTask(
       @JsonProperty("id") String id,
       @JsonProperty("dataSource") String dataSource,
       @JsonProperty("interval") Interval interval,
-      @JsonProperty("context") Map<String, Object> context
+      @JsonProperty("context") Map<String, Object> context,
+      @JsonProperty("markAsUnused") Boolean markAsUnused
   )
   {
     super(
@@ -65,6 +77,14 @@ public class KillUnusedSegmentsTask extends AbstractFixedIntervalTask
         interval,
         context
     );
+    this.markAsUnused = markAsUnused != null && markAsUnused;
+  }
+
+  @JsonProperty
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  public boolean isMarkAsUnused()
+  {
+    return markAsUnused;
   }
 
   @Override
@@ -73,10 +93,26 @@ public class KillUnusedSegmentsTask extends AbstractFixedIntervalTask
     return "kill";
   }
 
+  @Nonnull
+  @JsonIgnore
   @Override
-  public TaskStatus run(TaskToolbox toolbox) throws Exception
+  public Set<ResourceAction> getInputSourceResources()
+  {
+    return ImmutableSet.of();
+  }
+
+  @Override
+  public TaskStatus runTask(TaskToolbox toolbox) throws Exception
   {
     final NavigableMap<DateTime, List<TaskLock>> taskLockMap = getTaskLockMap(toolbox.getTaskActionClient());
+
+    if (markAsUnused) {
+      int numMarked = toolbox.getTaskActionClient().submit(
+          new MarkSegmentsAsUnusedAction(getDataSource(), getInterval())
+      );
+      LOG.info("Marked %d segments as unused.", numMarked);
+    }
+
     // List unused segments
     final List<DataSegment> unusedSegments = toolbox
         .getTaskActionClient()

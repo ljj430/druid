@@ -37,10 +37,10 @@ import org.apache.druid.jackson.DefaultObjectMapper;
 import org.apache.druid.java.util.common.DateTimes;
 import org.apache.druid.java.util.common.FileUtils;
 import org.apache.druid.java.util.common.Intervals;
-import org.apache.druid.java.util.common.concurrent.Execs;
 import org.apache.druid.java.util.common.granularity.Granularities;
 import org.apache.druid.java.util.emitter.service.ServiceEmitter;
 import org.apache.druid.query.DefaultQueryRunnerFactoryConglomerate;
+import org.apache.druid.query.DirectQueryProcessingPool;
 import org.apache.druid.query.aggregation.AggregatorFactory;
 import org.apache.druid.query.aggregation.CountAggregatorFactory;
 import org.apache.druid.segment.QueryableIndex;
@@ -68,7 +68,9 @@ import org.joda.time.Interval;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -119,6 +121,9 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
   private FireDepartmentMetrics metrics;
   private File tmpDir;
 
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
   public RealtimePlumberSchoolTest(
       RejectionPolicyFactory rejectionPolicy,
       SegmentWriteOutMediumFactory segmentWriteOutMediumFactory
@@ -141,7 +146,7 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
             new StringInputRowParser(
                 new JSONParseSpec(
                     new TimestampSpec("timestamp", "auto", null),
-                    new DimensionsSpec(null, null, null),
+                    DimensionsSpec.EMPTY,
                     null,
                     null,
                     null
@@ -162,7 +167,7 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
             new StringInputRowParser(
                 new JSONParseSpec(
                     new TimestampSpec("timestamp", "auto", null),
-                    new DimensionsSpec(null, null, null),
+                    DimensionsSpec.EMPTY,
                     null,
                     null,
                     null
@@ -207,14 +212,13 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
         null,
         null,
         null,
-        null,
+        temporaryFolder.newFolder(),
         new IntervalStartVersioningPolicy(),
         rejectionPolicy,
         null,
         null,
         null,
         null,
-        true,
         0,
         0,
         false,
@@ -231,7 +235,7 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
         announcer,
         segmentPublisher,
         handoffNotifierFactory,
-        Execs.directExecutor(),
+        DirectQueryProcessingPool.INSTANCE,
         NoopJoinableFactory.INSTANCE,
         TestHelper.getTestIndexMergerV9(segmentWriteOutMediumFactory),
         TestHelper.getTestIndexIO(),
@@ -284,6 +288,7 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
         tuningConfig.getAppendableIndexSpec(),
         tuningConfig.getMaxRowsInMemory(),
         tuningConfig.getMaxBytesInMemoryOrDefault(),
+        true,
         tuningConfig.getDedupColumn()
     );
     plumber.getSinks().put(0L, sink);
@@ -330,6 +335,7 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
         tuningConfig.getAppendableIndexSpec(),
         tuningConfig.getMaxRowsInMemory(),
         tuningConfig.getMaxBytesInMemoryOrDefault(),
+        true,
         tuningConfig.getDedupColumn()
     );
     plumber.getSinks().put(0L, sink);
@@ -381,6 +387,7 @@ public class RealtimePlumberSchoolTest extends InitializedNullHandlingTest
         tuningConfig.getAppendableIndexSpec(),
         tuningConfig.getMaxRowsInMemory(),
         tuningConfig.getMaxBytesInMemoryOrDefault(),
+        true,
         tuningConfig.getDedupColumn()
     );
     plumber2.getSinks().put(0L, sink);
