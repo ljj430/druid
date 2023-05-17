@@ -19,7 +19,6 @@
 
 package org.apache.druid.frame.write;
 
-import com.google.common.base.Throwables;
 import com.google.common.primitives.Ints;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.memory.WritableMemory;
@@ -126,7 +125,6 @@ public class RowBasedFrameWriter implements FrameWriter
       }
     }
     catch (Exception e) {
-      Throwables.propagateIfInstanceOf(e, ParseException.class);
       throw new ParseException("", e, "Unable to add the row to the frame. Type conversion might be required.");
     }
 

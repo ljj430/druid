@@ -19,7 +19,6 @@
 
 package org.apache.druid.frame.key;
 
-import org.apache.datasketches.memory.Memory;
 import org.apache.druid.frame.Frame;
 
 /**
@@ -36,14 +35,9 @@ public interface FrameComparisonWidget
   RowKey readKey(int row);
 
   /**
-   * Whether a particular row has no null fields in its comparison key.
-   *
-   * When {@link org.apache.druid.common.config.NullHandling#replaceWithDefault()}, default values (like empty strings
-   * and numeric zeroes) are considered null for purposes of this method. This behavior is inherited from
-   * {@link org.apache.druid.frame.field.FieldReader#isNull(Memory, long)} and enables join code to behave
-   * similarly in MSQ and native queries.
+   * Whether a particular row has a null field in its comparison key.
    */
-  boolean isCompletelyNonNullKey(int row);
+  boolean isPartiallyNullKey(int row);
 
   /**
    * Compare a specific row of this frame to the provided key. The key must have been created with sortColumns

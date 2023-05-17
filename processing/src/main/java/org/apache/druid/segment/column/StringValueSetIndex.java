@@ -30,8 +30,7 @@ import java.util.SortedSet;
 public interface StringValueSetIndex
 {
   /**
-   * Get the {@link ImmutableBitmap} corresponding to the supplied value.  Generates an empty bitmap when passed a
-   * value that doesn't exist.  Never returns null.
+   * Get the {@link ImmutableBitmap} corresponding to the supplied value
    */
   BitmapColumnIndex forValue(@Nullable String value);
 

@@ -114,9 +114,13 @@ public class JoinDataSource implements DataSource
     this.rightPrefix = JoinPrefixUtils.validatePrefix(rightPrefix);
     this.conditionAnalysis = Preconditions.checkNotNull(conditionAnalysis, "conditionAnalysis");
     this.joinType = Preconditions.checkNotNull(joinType, "joinType");
-    this.leftFilter = validateLeftFilter(left, leftFilter);
+    //TODO: Add support for union data sources
+    Preconditions.checkArgument(
+        leftFilter == null || left instanceof TableDataSource,
+        "left filter is only supported if left data source is direct table access"
+    );
+    this.leftFilter = leftFilter;
     this.joinableFactoryWrapper = joinableFactoryWrapper;
-
     this.analysis = this.getAnalysisForDataSource();
   }
 
@@ -464,9 +468,7 @@ public class JoinDataSource implements DataSource
       keyBuilder.appendCacheable(analysis.getJoinBaseTableFilter().get());
     }
     for (PreJoinableClause clause : clauses) {
-      final Optional<byte[]> bytes =
-          joinableFactoryWrapper.getJoinableFactory()
-                                .computeJoinCacheKey(clause.getDataSource(), clause.getCondition());
+      Optional<byte[]> bytes = joinableFactoryWrapper.getJoinableFactory().computeJoinCacheKey(clause.getDataSource(), clause.getCondition());
       if (!bytes.isPresent()) {
         // Encountered a data source which didn't support cache yet
         log.debug("skipping caching for join since [%s] does not support caching", clause.getDataSource());
@@ -507,7 +509,10 @@ public class JoinDataSource implements DataSource
     while (current instanceof JoinDataSource) {
       final JoinDataSource joinDataSource = (JoinDataSource) current;
       current = joinDataSource.getLeft();
-      currentDimFilter = validateLeftFilter(current, joinDataSource.getLeftFilter());
+      if (currentDimFilter != null) {
+        throw new IAE("Left filters are only allowed when left child is direct table access");
+      }
+      currentDimFilter = joinDataSource.getLeftFilter();
       preJoinableClauses.add(
           new PreJoinableClause(
               joinDataSource.getRightPrefix(),
@@ -523,22 +528,5 @@ public class JoinDataSource implements DataSource
     Collections.reverse(preJoinableClauses);
 
     return Triple.of(current, currentDimFilter, preJoinableClauses);
-  }
-
-  /**
-   * Validates whether the provided leftFilter is permitted to apply to the provided left-hand datasource. Throws an
-   * exception if the combination is invalid. Returns the filter if the combination is valid.
-   */
-  @Nullable
-  private static DimFilter validateLeftFilter(final DataSource leftDataSource, @Nullable final DimFilter leftFilter)
-  {
-    // Currently we only support leftFilter when applied to concrete leaf datasources (ones with no children).
-    // Note that this mean we don't support unions of table, even though this would be reasonable to add in the future.
-    Preconditions.checkArgument(
-        leftFilter == null || (leftDataSource.isConcrete() && leftDataSource.getChildren().isEmpty()),
-        "left filter is only supported if left data source is direct table access"
-    );
-
-    return leftFilter;
   }
 }

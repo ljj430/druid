@@ -23,7 +23,7 @@ import { Api } from '../singletons';
 
 export async function getClusterCapacity(): Promise<CapacityInfo> {
   const workersResponse = await Api.instance.get('/druid/indexer/v1/workers', {
-    timeout: 5000,
+    timeout: 500,
   });
 
   const usedTaskSlots = sum(

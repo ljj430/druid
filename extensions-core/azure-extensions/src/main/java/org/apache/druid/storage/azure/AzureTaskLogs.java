@@ -82,14 +82,6 @@ public class AzureTaskLogs implements TaskLogs
     pushTaskFile(reportFile, taskKey);
   }
 
-  @Override
-  public void pushTaskStatus(String taskid, File statusFile)
-  {
-    final String taskKey = getTaskStatusKey(taskid);
-    log.info("Pushing task status %s to: %s", statusFile, taskKey);
-    pushTaskFile(statusFile, taskKey);
-  }
-
   private void pushTaskFile(final File logFile, String taskKey)
   {
     try {
@@ -116,12 +108,6 @@ public class AzureTaskLogs implements TaskLogs
   public Optional<InputStream> streamTaskReports(String taskid) throws IOException
   {
     return streamTaskFile(taskid, 0, getTaskReportsKey(taskid));
-  }
-
-  @Override
-  public Optional<InputStream> streamTaskStatus(String taskid) throws IOException
-  {
-    return streamTaskFile(taskid, 0, getTaskStatusKey(taskid));
   }
 
   private Optional<InputStream> streamTaskFile(final String taskid, final long offset, String taskKey)
@@ -166,11 +152,6 @@ public class AzureTaskLogs implements TaskLogs
   private String getTaskReportsKey(String taskid)
   {
     return StringUtils.format("%s/%s/report.json", config.getPrefix(), taskid);
-  }
-
-  private String getTaskStatusKey(String taskid)
-  {
-    return StringUtils.format("%s/%s/status.json", config.getPrefix(), taskid);
   }
 
   @Override

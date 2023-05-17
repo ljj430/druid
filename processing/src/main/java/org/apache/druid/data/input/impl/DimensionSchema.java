@@ -68,8 +68,8 @@ public abstract class DimensionSchema
       case DOUBLE:
         return new DoubleDimensionSchema(name);
       default:
-        // the auto column indexer can handle any type
-        return new AutoTypeColumnSchema(name);
+        // the nested column indexer can handle any type
+        return new NestedDataDimensionSchema(name);
     }
   }
 

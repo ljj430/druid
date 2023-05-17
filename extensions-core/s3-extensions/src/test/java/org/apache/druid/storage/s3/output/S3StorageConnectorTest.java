@@ -80,6 +80,7 @@ public class S3StorageConnectorTest
           temporaryFolder.newFolder(),
           null,
           null,
+          null,
           true
       ), SERVICE);
     }

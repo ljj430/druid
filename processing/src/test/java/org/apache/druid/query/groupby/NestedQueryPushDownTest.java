@@ -191,7 +191,7 @@ public class NestedQueryPushDownTest extends InitializedNullHandlingTest
     final File fileA = INDEX_MERGER_V9.persist(
         indexA,
         new File(tmpDir, "A"),
-        IndexSpec.DEFAULT,
+        new IndexSpec(),
         null
     );
     QueryableIndex qindexA = INDEX_IO.loadIndex(fileA);
@@ -235,7 +235,7 @@ public class NestedQueryPushDownTest extends InitializedNullHandlingTest
     final File fileB = INDEX_MERGER_V9.persist(
         indexB,
         new File(tmpDir, "B"),
-        IndexSpec.DEFAULT,
+        new IndexSpec(),
         null
     );
     QueryableIndex qindexB = INDEX_IO.loadIndex(fileB);

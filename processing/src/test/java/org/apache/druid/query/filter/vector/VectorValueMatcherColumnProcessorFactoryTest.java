@@ -19,6 +19,7 @@
 
 package org.apache.druid.query.filter.vector;
 
+import org.apache.druid.common.config.NullHandling;
 import org.apache.druid.segment.IdLookup;
 import org.apache.druid.segment.column.ColumnCapabilitiesImpl;
 import org.apache.druid.segment.column.ColumnType;
@@ -62,8 +63,13 @@ public class VectorValueMatcherColumnProcessorFactoryTest extends InitializedNul
     Assert.assertEquals(VECTOR_SIZE, matcher.getMaxVectorSize());
     Assert.assertEquals(CURRENT_SIZE, matcher.getCurrentVectorSize());
 
+    // in default mode, matching null produces a boolean matcher
     VectorValueMatcher booleanMatcher = matcherFactory.makeMatcher((String) null);
-    Assert.assertFalse(booleanMatcher instanceof BooleanVectorValueMatcher);
+    if (NullHandling.replaceWithDefault()) {
+      Assert.assertTrue(booleanMatcher instanceof BooleanVectorValueMatcher);
+    } else {
+      Assert.assertFalse(booleanMatcher instanceof BooleanVectorValueMatcher);
+    }
     Assert.assertEquals(VECTOR_SIZE, booleanMatcher.getMaxVectorSize());
     Assert.assertEquals(CURRENT_SIZE, booleanMatcher.getCurrentVectorSize());
     EasyMock.verify(vectorValueSelector);
@@ -86,9 +92,13 @@ public class VectorValueMatcherColumnProcessorFactoryTest extends InitializedNul
     Assert.assertEquals(VECTOR_SIZE, matcher.getMaxVectorSize());
     Assert.assertEquals(CURRENT_SIZE, matcher.getCurrentVectorSize());
 
-
+    // in default mode, matching null produces a boolean matcher
     VectorValueMatcher booleanMatcher = matcherFactory.makeMatcher((String) null);
-    Assert.assertFalse(booleanMatcher instanceof BooleanVectorValueMatcher);
+    if (NullHandling.replaceWithDefault()) {
+      Assert.assertTrue(booleanMatcher instanceof BooleanVectorValueMatcher);
+    } else {
+      Assert.assertFalse(booleanMatcher instanceof BooleanVectorValueMatcher);
+    }
     Assert.assertEquals(VECTOR_SIZE, booleanMatcher.getMaxVectorSize());
     Assert.assertEquals(CURRENT_SIZE, booleanMatcher.getCurrentVectorSize());
     EasyMock.verify(vectorValueSelector);
@@ -110,8 +120,13 @@ public class VectorValueMatcherColumnProcessorFactoryTest extends InitializedNul
     Assert.assertEquals(VECTOR_SIZE, matcher.getMaxVectorSize());
     Assert.assertEquals(CURRENT_SIZE, matcher.getCurrentVectorSize());
 
+    // in default mode, matching null produces a boolean matcher
     VectorValueMatcher booleanMatcher = matcherFactory.makeMatcher((String) null);
-    Assert.assertFalse(booleanMatcher instanceof BooleanVectorValueMatcher);
+    if (NullHandling.replaceWithDefault()) {
+      Assert.assertTrue(booleanMatcher instanceof BooleanVectorValueMatcher);
+    } else {
+      Assert.assertFalse(booleanMatcher instanceof BooleanVectorValueMatcher);
+    }
     Assert.assertEquals(VECTOR_SIZE, booleanMatcher.getMaxVectorSize());
     Assert.assertEquals(CURRENT_SIZE, booleanMatcher.getCurrentVectorSize());
     EasyMock.verify(vectorValueSelector);

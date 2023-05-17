@@ -379,7 +379,7 @@ public class PartialDimensionDistributionTaskTest
       Assert.assertEquals(
           Collections.singleton(
               new ResourceAction(
-                  new Resource(InlineInputSource.TYPE_KEY, ResourceType.EXTERNAL),
+                  new Resource(ResourceType.EXTERNAL, InlineInputSource.TYPE_KEY),
                   Action.READ
               )),
           task.getInputSourceResources()

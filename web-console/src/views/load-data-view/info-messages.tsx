@@ -20,7 +20,7 @@ import { Button, Callout, Code, FormGroup, Intent } from '@blueprintjs/core';
 import React from 'react';
 
 import { ExternalLink, LearnMore } from '../../components';
-import type { IngestionSpec, SchemaMode } from '../../druid-models';
+import type { DimensionMode, IngestionSpec } from '../../druid-models';
 import { getIngestionDocLink } from '../../druid-models';
 import { getLink } from '../../links';
 import { deepGet, deepSet } from '../../utils';
@@ -129,11 +129,11 @@ export const FilterMessage = React.memo(function FilterMessage() {
 });
 
 export interface SchemaMessageProps {
-  schemaMode: SchemaMode;
+  dimensionMode: DimensionMode;
 }
 
 export const SchemaMessage = React.memo(function SchemaMessage(props: SchemaMessageProps) {
-  const { schemaMode } = props;
+  const { dimensionMode } = props;
 
   return (
     <FormGroup>
@@ -142,7 +142,7 @@ export const SchemaMessage = React.memo(function SchemaMessage(props: SchemaMess
           Each column in Druid must have an assigned type (string, long, float, double, complex,
           etc).
         </p>
-        {schemaMode === 'fixed' && (
+        {dimensionMode === 'specific' && (
           <p>
             Default primitive types have been automatically assigned to your columns. If you want to
             change the type, click on the column header.

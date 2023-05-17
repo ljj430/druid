@@ -77,14 +77,13 @@ public class ReferenceCountingResourceHolder<T> implements ResourceHolder<T>
   }
 
   /**
-   * Increments the reference count by 1 and returns a {@link ResourceHolder} representing the new references.
-   * The returned {@link ResourceHolder} "close" method decrements the reference count when the caller no longer
-   * needs the resource.
+   * Increments the reference count by 1 and returns a {@link Releaser}. The returned {@link Releaser} is used to
+   * decrement the reference count when the caller no longer needs the resource.
    *
-   * Returned {@link ResourceHolder} are not thread-safe. If multiple threads need references to the same resource, they
-   * should each call this method on the original object.
+   * {@link Releaser}s are not thread-safe. If multiple threads need references to the same holder, they should
+   * each acquire their own {@link Releaser}.
    */
-  public ResourceHolder<T> increment()
+  public Releaser increment()
   {
     while (true) {
       int count = this.refCount.get();
@@ -96,16 +95,10 @@ public class ReferenceCountingResourceHolder<T> implements ResourceHolder<T>
       }
     }
 
-    // This ResourceHolder is supposed to be used from a single thread, so no synchronization/atomicity
-    return new ResourceHolder<T>()
+    // This Releaser is supposed to be used from a single thread, so no synchronization/atomicity
+    return new Releaser()
     {
       boolean released = false;
-
-      @Override
-      public T get()
-      {
-        return object;
-      }
 
       @Override
       public void close()

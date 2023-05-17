@@ -282,7 +282,7 @@ public class FilteredAggregatorBenchmark
       File indexFile = INDEX_MERGER_V9.persist(
           incIndex,
           qIndexesDir,
-          IndexSpec.DEFAULT,
+          new IndexSpec(),
           null
       );
       incIndex.close();

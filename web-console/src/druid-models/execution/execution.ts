@@ -67,7 +67,7 @@ type ExecutionDestination =
   | {
       type: 'taskReport';
     }
-  | { type: 'dataSource'; dataSource: string; loaded?: boolean }
+  | { type: 'dataSource'; dataSource: string; exists?: boolean }
   | { type: 'download' };
 
 export type ExecutionStatus = 'RUNNING' | 'FAILED' | 'SUCCESS';
@@ -140,11 +140,10 @@ function formatPendingMessage(
 
   // If there are not enough slots free then there are two cases:
   if (totalNeeded <= totalTaskSlots) {
-    // (1) not enough free, but enough total: "Launched 2/4 tasks. Cluster is currently using 5/6 task slots. Waiting for 1 task slot to become available."
+    // (1) not enough free, but enough total: "Launched 2/4 tasks. Cluster is currently using 5/6 task slots. Waiting for 1 other task to finish."
     const tasksThatNeedToFinish = pendingTasks - availableTaskSlots;
     return (
-      baseMessage +
-      ` Waiting for ${pluralIfNeeded(tasksThatNeedToFinish, 'task slot')} to become available.`
+      baseMessage + ` Waiting for ${pluralIfNeeded(tasksThatNeedToFinish, 'other task')} to finish.`
     );
   } else {
     // (2) not enough total: "Launched 2/4 tasks. Cluster is currently using 2/2 task slots. Add more capacity or reduce maxNumTasks to 2 or lower."
@@ -506,7 +505,7 @@ export class Execution {
     });
   }
 
-  public markDestinationDatasourceLoaded(): Execution {
+  public markDestinationDatasourceExists(): Execution {
     const { destination } = this;
     if (destination?.type !== 'dataSource') return this;
 
@@ -514,7 +513,7 @@ export class Execution {
       ...this.valueOf(),
       destination: {
         ...destination,
-        loaded: true,
+        exists: true,
       },
     });
   }
@@ -538,7 +537,7 @@ export class Execution {
 
     const { status, destination } = this;
     if (status === 'SUCCESS' && destination?.type === 'dataSource') {
-      return Boolean(destination.loaded);
+      return Boolean(destination.exists);
     }
 
     return true;

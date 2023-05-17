@@ -65,6 +65,7 @@ public class RetryableS3OutputStreamTest
 
 
   private S3OutputConfig config;
+  private long maxResultsSize;
   private long chunkSize;
 
   @Before
@@ -77,6 +78,7 @@ public class RetryableS3OutputStreamTest
         "TEST",
         tempDir,
         HumanReadableBytes.valueOf(chunkSize),
+        HumanReadableBytes.valueOf(maxResultsSize),
         2,
         false
     )
@@ -94,6 +96,12 @@ public class RetryableS3OutputStreamTest
       }
 
       @Override
+      public long getMaxResultsSize()
+      {
+        return maxResultsSize;
+      }
+
+      @Override
       public int getMaxRetry()
       {
         return 2;
@@ -104,6 +112,7 @@ public class RetryableS3OutputStreamTest
   @Test
   public void testWriteAndHappy() throws IOException
   {
+    maxResultsSize = 1000;
     chunkSize = 10;
     ByteBuffer bb = ByteBuffer.allocate(Integer.BYTES);
     try (RetryableS3OutputStream out = new RetryableS3OutputStream(
@@ -126,6 +135,7 @@ public class RetryableS3OutputStreamTest
   @Test
   public void testWriteSizeLargerThanConfiguredMaxChunkSizeShouldSucceed() throws IOException
   {
+    maxResultsSize = 1000;
     chunkSize = 10;
     ByteBuffer bb = ByteBuffer.allocate(Integer.BYTES * 3);
     try (RetryableS3OutputStream out = new RetryableS3OutputStream(
@@ -148,6 +158,7 @@ public class RetryableS3OutputStreamTest
   @Test
   public void testWriteSmallBufferShouldSucceed() throws IOException
   {
+    maxResultsSize = 1000;
     chunkSize = 128;
     try (RetryableS3OutputStream out = new RetryableS3OutputStream(
         config,
@@ -165,10 +176,42 @@ public class RetryableS3OutputStreamTest
   }
 
   @Test
+  public void testHitResultsSizeLimit() throws IOException
+  {
+    maxResultsSize = 50;
+    ByteBuffer bb = ByteBuffer.allocate(Integer.BYTES);
+    try (RetryableS3OutputStream out = new RetryableS3OutputStream(
+        config,
+        s3,
+        path,
+        false
+    )) {
+      for (int i = 0; i < 14; i++) {
+        bb.clear();
+        bb.putInt(i);
+        out.write(bb.array());
+      }
+
+      Assert.assertThrows(
+          "Exceeded max results size [50]",
+          IOException.class,
+          () -> {
+            bb.clear();
+            bb.putInt(14);
+            out.write(bb.array());
+          }
+      );
+    }
+
+    s3.assertCancelled();
+  }
+
+  @Test
   public void testSuccessToUploadAfterRetry() throws IOException
   {
     final TestAmazonS3 s3 = new TestAmazonS3(1);
 
+    maxResultsSize = 1000;
     chunkSize = 10;
     ByteBuffer bb = ByteBuffer.allocate(Integer.BYTES);
     try (RetryableS3OutputStream out = new RetryableS3OutputStream(
@@ -193,6 +236,7 @@ public class RetryableS3OutputStreamTest
   {
     final TestAmazonS3 s3 = new TestAmazonS3(3);
 
+    maxResultsSize = 1000;
     ByteBuffer bb = ByteBuffer.allocate(Integer.BYTES);
     try (RetryableS3OutputStream out = new RetryableS3OutputStream(
         config,

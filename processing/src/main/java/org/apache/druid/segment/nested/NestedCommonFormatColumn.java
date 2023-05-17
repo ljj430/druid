@@ -31,7 +31,6 @@ import org.apache.druid.segment.column.ColumnCapabilitiesImpl;
 import org.apache.druid.segment.column.ColumnFormat;
 import org.apache.druid.segment.column.ColumnType;
 import org.apache.druid.segment.data.Indexed;
-import org.apache.druid.segment.serde.NestedCommonFormatColumnPartSerde;
 
 import javax.annotation.Nullable;
 import java.util.SortedMap;
@@ -40,15 +39,7 @@ import java.util.TreeMap;
 /**
  * Base implementation for columns created with {@link AutoTypeColumnSchema} and handled with
  * {@link NestedCommonFormatColumnHandler} to allow ease of merge via
- * {@link AutoTypeColumnMerger} by providing a common implementation. All columns are read with
- * {@link NestedCommonFormatColumnPartSerde}
- *
- * @see ScalarDoubleColumn
- * @see ScalarLongColumn
- * @see ScalarStringDictionaryEncodedColumn
- * @see org.apache.druid.segment.column.StringFrontCodedDictionaryEncodedColumn
- * @see VariantColumn
- * @see CompressedNestedDataComplexColumn
+ * {@link AutoTypeColumnMerger}
  */
 public interface NestedCommonFormatColumn extends BaseColumn
 {
@@ -145,10 +136,9 @@ public interface NestedCommonFormatColumn extends BaseColumn
                                      .setDictionaryValuesSorted(true)
                                      .setDictionaryValuesUnique(true)
                                      .setHasBitmapIndexes(true)
-                                     .setFilterable(true)
                                      .setHasNulls(hasNulls);
       }
-      return ColumnCapabilitiesImpl.createDefault().setType(logicalType).setHasNulls(hasNulls).setFilterable(true);
+      return ColumnCapabilitiesImpl.createDefault().setType(logicalType).setHasNulls(hasNulls);
     }
   }
 }

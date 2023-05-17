@@ -21,7 +21,6 @@ package org.apache.druid.server.coordinator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.druid.common.config.Configs;
 
 /**
  */
@@ -38,15 +37,11 @@ public class CoordinatorOverlordServiceConfig
       @JsonProperty("overlordService") String overlordService
   )
   {
-    this.enabled = Configs.valueOrDefault(enabled, false);
+    this.enabled = enabled == null ? false : enabled.booleanValue();
     this.overlordService = overlordService;
 
-    if (this.enabled) {
-      Preconditions.checkArgument(
-          this.overlordService != null,
-          "'overlordService' must be specified when running Coordinator as Overlord."
-      );
-    }
+    Preconditions.checkArgument((this.enabled && this.overlordService != null) || !this.enabled,
+                                "coordinator is enabled to be overlord but overlordService is not specified");
   }
 
   public boolean isEnabled()

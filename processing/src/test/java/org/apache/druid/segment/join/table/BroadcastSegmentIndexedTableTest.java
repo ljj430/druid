@@ -120,7 +120,7 @@ public class BroadcastSegmentIndexedTableTest extends InitializedNullHandlingTes
         data,
         testInterval,
         segment,
-        IndexSpec.DEFAULT,
+        new IndexSpec(),
         null
     );
     File factoryJson = new File(persisted, "factory.json");

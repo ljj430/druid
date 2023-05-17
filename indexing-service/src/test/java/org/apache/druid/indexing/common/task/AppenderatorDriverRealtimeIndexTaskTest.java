@@ -54,6 +54,7 @@ import org.apache.druid.indexing.common.IngestionStatsAndErrorsTaskReportData;
 import org.apache.druid.indexing.common.SegmentCacheManagerFactory;
 import org.apache.druid.indexing.common.SingleFileTaskReportFileWriter;
 import org.apache.druid.indexing.common.TaskReport;
+import org.apache.druid.indexing.common.TaskStorageDirTracker;
 import org.apache.druid.indexing.common.TaskToolbox;
 import org.apache.druid.indexing.common.TaskToolboxFactory;
 import org.apache.druid.indexing.common.TestUtils;
@@ -62,7 +63,6 @@ import org.apache.druid.indexing.common.actions.TaskActionClientFactory;
 import org.apache.druid.indexing.common.actions.TaskActionToolbox;
 import org.apache.druid.indexing.common.actions.TaskAuditLogConfig;
 import org.apache.druid.indexing.common.config.TaskConfig;
-import org.apache.druid.indexing.common.config.TaskConfigBuilder;
 import org.apache.druid.indexing.common.config.TaskStorageConfig;
 import org.apache.druid.indexing.common.index.RealtimeAppenderatorIngestionSpec;
 import org.apache.druid.indexing.common.index.RealtimeAppenderatorTuningConfig;
@@ -1544,12 +1544,23 @@ public class AppenderatorDriverRealtimeIndexTaskTest extends InitializedNullHand
     };
 
     taskLockbox = new TaskLockbox(taskStorage, mdc);
-    final TaskConfig taskConfig = new TaskConfigBuilder()
-        .setBaseDir(directory.getPath())
-        .setDefaultRowFlushBoundary(50000)
-        .setRestoreTasksOnRestart(true)
-        .setBatchProcessingMode(TaskConfig.BATCH_PROCESSING_MODE_DEFAULT.name())
-        .build();
+    final TaskConfig taskConfig = new TaskConfig(
+        directory.getPath(),
+        null,
+        null,
+        50000,
+        null,
+        true,
+        null,
+        null,
+        null,
+        false,
+        false,
+        TaskConfig.BATCH_PROCESSING_MODE_DEFAULT.name(),
+        null,
+        false,
+        null
+    );
 
     final TaskActionToolbox taskActionToolbox = new TaskActionToolbox(
         taskLockbox,
@@ -1643,7 +1654,8 @@ public class AppenderatorDriverRealtimeIndexTaskTest extends InitializedNullHand
         null,
         null,
         null,
-        "1"
+        "1",
+        new TaskStorageDirTracker(taskConfig)
     );
   }
 

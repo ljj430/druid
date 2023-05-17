@@ -102,6 +102,6 @@ public class DruidAuthModuleTest
         AuthConfig.class
     );
     provider.inject(properties, injector.getInstance(JsonConfigurator.class));
-    return provider.get();
+    return provider.get().get();
   }
 }

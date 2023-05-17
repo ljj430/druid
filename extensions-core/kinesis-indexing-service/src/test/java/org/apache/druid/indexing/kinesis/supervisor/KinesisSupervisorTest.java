@@ -4130,10 +4130,10 @@ public class KinesisSupervisorTest extends EasyMockSupport
     Assert.assertEquals(
         Collections.singleton(
             new ResourceAction(
-                new Resource(KinesisSupervisorSpec.SUPERVISOR_TYPE, ResourceType.EXTERNAL),
+                new Resource(ResourceType.EXTERNAL, KinesisSupervisorSpec.SUPERVISOR_TYPE),
                 Action.READ
             )),
-        supervisorSpec.getInputSourceResources()
+        supervisorSpec.getInputSourceTypes()
     );
   }
 

@@ -78,13 +78,13 @@ public class ParallelIndexTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, 100L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         false,
         true,
@@ -125,13 +125,13 @@ public class ParallelIndexTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, 100L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         false,
         true,
@@ -172,13 +172,13 @@ public class ParallelIndexTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, 100L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         false,
         true,
@@ -221,13 +221,13 @@ public class ParallelIndexTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, 100L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         false,
         true,
@@ -267,13 +267,13 @@ public class ParallelIndexTuningConfigTest
         null,
         null,
         new HashedPartitionsSpec(null, 10, null),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         forceGuaranteedRollup,
         true,
@@ -313,13 +313,13 @@ public class ParallelIndexTuningConfigTest
         null,
         null,
         new SingleDimensionPartitionsSpec(100, null, "dim", false),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         forceGuaranteedRollup,
         true,
@@ -359,13 +359,13 @@ public class ParallelIndexTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, null),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         forceGuaranteedRollup,
         true,
@@ -392,12 +392,7 @@ public class ParallelIndexTuningConfigTest
   public void testEqualsAndHashCode()
   {
     EqualsVerifier.forClass(ParallelIndexTuningConfig.class)
-                  .usingGetClass()
-                  .withPrefabValues(
-                      IndexSpec.class,
-                      IndexSpec.DEFAULT,
-                      IndexSpec.builder().withDimensionCompression(CompressionStrategy.ZSTD).build()
-                  )
-                  .verify();
+        .usingGetClass()
+        .verify();
   }
 }

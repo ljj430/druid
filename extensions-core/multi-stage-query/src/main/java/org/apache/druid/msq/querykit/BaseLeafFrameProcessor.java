@@ -41,6 +41,7 @@ import org.apache.druid.query.Query;
 import org.apache.druid.segment.ReferenceCountingSegment;
 import org.apache.druid.segment.Segment;
 import org.apache.druid.segment.SegmentReference;
+import org.apache.druid.segment.join.JoinableFactoryWrapper;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,7 +55,7 @@ public abstract class BaseLeafFrameProcessor implements FrameProcessor<Long>
   private final Query<?> query;
   private final ReadableInput baseInput;
   private final List<ReadableFrameChannel> inputChannels;
-  private final ResourceHolder<WritableFrameChannel> outputChannelHolder;
+  private final ResourceHolder<WritableFrameChannel> outputChannel;
   private final ResourceHolder<FrameWriterFactory> frameWriterFactoryHolder;
   private final BroadcastJoinHelper broadcastJoinHelper;
 
@@ -64,14 +65,15 @@ public abstract class BaseLeafFrameProcessor implements FrameProcessor<Long>
       final Query<?> query,
       final ReadableInput baseInput,
       final Int2ObjectMap<ReadableInput> sideChannels,
-      final ResourceHolder<WritableFrameChannel> outputChannelHolder,
+      final JoinableFactoryWrapper joinableFactory,
+      final ResourceHolder<WritableFrameChannel> outputChannel,
       final ResourceHolder<FrameWriterFactory> frameWriterFactoryHolder,
       final long memoryReservedForBroadcastJoin
   )
   {
     this.query = query;
     this.baseInput = baseInput;
-    this.outputChannelHolder = outputChannelHolder;
+    this.outputChannel = outputChannel;
     this.frameWriterFactoryHolder = frameWriterFactoryHolder;
 
     final Pair<List<ReadableFrameChannel>, BroadcastJoinHelper> inputChannelsAndBroadcastJoinHelper =
@@ -79,6 +81,7 @@ public abstract class BaseLeafFrameProcessor implements FrameProcessor<Long>
             query.getDataSource(),
             baseInput,
             sideChannels,
+            joinableFactory,
             memoryReservedForBroadcastJoin
         );
 
@@ -93,6 +96,7 @@ public abstract class BaseLeafFrameProcessor implements FrameProcessor<Long>
       final DataSource dataSource,
       final ReadableInput baseInput,
       final Int2ObjectMap<ReadableInput> sideChannels,
+      final JoinableFactoryWrapper joinableFactory,
       final long memoryReservedForBroadcastJoin
   )
   {
@@ -127,6 +131,7 @@ public abstract class BaseLeafFrameProcessor implements FrameProcessor<Long>
           inputNumberToProcessorChannelMap,
           inputChannels,
           channelReaders,
+          joinableFactory,
           memoryReservedForBroadcastJoin
       );
     } else {
@@ -145,7 +150,7 @@ public abstract class BaseLeafFrameProcessor implements FrameProcessor<Long>
   @Override
   public List<WritableFrameChannel> outputChannels()
   {
-    return Collections.singletonList(outputChannelHolder.get());
+    return Collections.singletonList(outputChannel.get());
   }
 
   @Override
@@ -166,7 +171,9 @@ public abstract class BaseLeafFrameProcessor implements FrameProcessor<Long>
   @Override
   public void cleanup() throws IOException
   {
-    FrameProcessors.closeAll(inputChannels(), Collections.emptyList(), outputChannelHolder, frameWriterFactoryHolder);
+    // Don't close the output channel, because multiple workers write to the same channel.
+    // The channel should be closed by the caller.
+    FrameProcessors.closeAll(inputChannels(), Collections.emptyList(), outputChannel, frameWriterFactoryHolder);
   }
 
   protected FrameWriterFactory getFrameWriterFactory()

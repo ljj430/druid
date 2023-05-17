@@ -338,7 +338,7 @@ public class NestedFieldColumnSelectorsTest
         NestedDataTestUtils.COUNT,
         Granularities.NONE,
         true,
-        IndexSpec.DEFAULT
+        new IndexSpec()
     );
     Assert.assertEquals(1, segments.size());
     StorageAdapter storageAdapter = segments.get(0).asStorageAdapter();
@@ -369,7 +369,7 @@ public class NestedFieldColumnSelectorsTest
         NestedDataTestUtils.COUNT,
         Granularities.NONE,
         true,
-        IndexSpec.DEFAULT
+        new IndexSpec()
     );
     Assert.assertEquals(1, segments.size());
     StorageAdapter storageAdapter = segments.get(0).asStorageAdapter();

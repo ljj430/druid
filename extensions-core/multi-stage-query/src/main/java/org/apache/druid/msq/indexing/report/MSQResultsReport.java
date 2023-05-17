@@ -23,30 +23,24 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.druid.java.util.common.guava.Sequences;
 import org.apache.druid.java.util.common.guava.Yielder;
 import org.apache.druid.java.util.common.guava.Yielders;
-import org.apache.druid.segment.column.ColumnType;
+import org.apache.druid.segment.column.RowSignature;
 
 import javax.annotation.Nullable;
 import java.util.List;
-import java.util.Objects;
 
 public class MSQResultsReport
 {
-  /**
-   * Like {@link org.apache.druid.segment.column.RowSignature}, but allows duplicate column names for compatibility
-   * with SQL (which also allows duplicate column names in query results).
-   */
-  private final List<ColumnAndType> signature;
+  private final RowSignature signature;
   @Nullable
-  private final List<SqlTypeName> sqlTypeNames;
+  private final List<String> sqlTypeNames;
   private final Yielder<Object[]> resultYielder;
 
   public MSQResultsReport(
-      final List<ColumnAndType> signature,
-      @Nullable final List<SqlTypeName> sqlTypeNames,
+      final RowSignature signature,
+      @Nullable final List<String> sqlTypeNames,
       final Yielder<Object[]> resultYielder
   )
   {
@@ -60,8 +54,8 @@ public class MSQResultsReport
    */
   @JsonCreator
   static MSQResultsReport fromJson(
-      @JsonProperty("signature") final List<ColumnAndType> signature,
-      @JsonProperty("sqlTypeNames") @Nullable final List<SqlTypeName> sqlTypeNames,
+      @JsonProperty("signature") final RowSignature signature,
+      @JsonProperty("sqlTypeNames") @Nullable final List<String> sqlTypeNames,
       @JsonProperty("results") final List<Object[]> results
   )
   {
@@ -69,7 +63,7 @@ public class MSQResultsReport
   }
 
   @JsonProperty("signature")
-  public List<ColumnAndType> getSignature()
+  public RowSignature getSignature()
   {
     return signature;
   }
@@ -77,7 +71,7 @@ public class MSQResultsReport
   @Nullable
   @JsonProperty("sqlTypeNames")
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public List<SqlTypeName> getSqlTypeNames()
+  public List<String> getSqlTypeNames()
   {
     return sqlTypeNames;
   }
@@ -86,59 +80,5 @@ public class MSQResultsReport
   public Yielder<Object[]> getResultYielder()
   {
     return resultYielder;
-  }
-
-  public static class ColumnAndType
-  {
-    private final String name;
-    private final ColumnType type;
-
-    @JsonCreator
-    public ColumnAndType(
-        @JsonProperty("name") String name,
-        @JsonProperty("type") ColumnType type
-    )
-    {
-      this.name = name;
-      this.type = type;
-    }
-
-    @JsonProperty
-    public String getName()
-    {
-      return name;
-    }
-
-    @JsonProperty
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    public ColumnType getType()
-    {
-      return type;
-    }
-
-    @Override
-    public boolean equals(Object o)
-    {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      ColumnAndType that = (ColumnAndType) o;
-      return Objects.equals(name, that.name) && Objects.equals(type, that.type);
-    }
-
-    @Override
-    public int hashCode()
-    {
-      return Objects.hash(name, type);
-    }
-
-    @Override
-    public String toString()
-    {
-      return name + ":" + type;
-    }
   }
 }

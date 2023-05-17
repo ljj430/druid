@@ -36,13 +36,7 @@ public class MultiValueStringToArrayOperatorConversion extends DirectOperatorCon
 {
   public static final SqlFunction SQL_FUNCTION = OperatorConversions
       .operatorBuilder("MV_TO_ARRAY")
-      // allow using arrays as inputs to MV_TO_ARRAY to assist with migration of MVDs to ARRAY types
-      .operandTypeChecker(
-          OperandTypes.or(
-              OperandTypes.family(SqlTypeFamily.STRING),
-              OperandTypes.family(SqlTypeFamily.ARRAY)
-          )
-      )
+      .operandTypeChecker(OperandTypes.family(SqlTypeFamily.STRING))
       .functionCategory(SqlFunctionCategory.STRING)
       .returnTypeNullableArrayWithNullableElements(SqlTypeName.VARCHAR)
       .build();

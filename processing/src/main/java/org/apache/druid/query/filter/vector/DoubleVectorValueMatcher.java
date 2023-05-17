@@ -19,6 +19,7 @@
 
 package org.apache.druid.query.filter.vector;
 
+import org.apache.druid.common.config.NullHandling;
 import org.apache.druid.query.filter.DruidDoublePredicate;
 import org.apache.druid.query.filter.DruidPredicateFactory;
 import org.apache.druid.segment.DimensionHandlerUtils;
@@ -29,6 +30,7 @@ import javax.annotation.Nullable;
 public class DoubleVectorValueMatcher implements VectorValueMatcherFactory
 {
   private final VectorValueSelector selector;
+  private final boolean canHaveNulls = !NullHandling.replaceWithDefault();
 
   public DoubleVectorValueMatcher(final VectorValueSelector selector)
   {
@@ -38,7 +40,7 @@ public class DoubleVectorValueMatcher implements VectorValueMatcherFactory
   @Override
   public VectorValueMatcher makeMatcher(@Nullable final String value)
   {
-    if (value == null) {
+    if (value == null && canHaveNulls) {
       return makeNullValueMatcher(selector);
     }
 
@@ -60,7 +62,7 @@ public class DoubleVectorValueMatcher implements VectorValueMatcherFactory
         final double[] vector = selector.getDoubleVector();
         final int[] selection = match.getSelection();
         final boolean[] nulls = selector.getNullVector();
-        final boolean hasNulls = nulls != null;
+        final boolean hasNulls = canHaveNulls && nulls != null;
         int numRows = 0;
 
         for (int i = 0; i < mask.getSelectionSize(); i++) {
@@ -95,7 +97,7 @@ public class DoubleVectorValueMatcher implements VectorValueMatcherFactory
         final double[] vector = selector.getDoubleVector();
         final int[] selection = match.getSelection();
         final boolean[] nulls = selector.getNullVector();
-        final boolean hasNulls = nulls != null;
+        final boolean hasNulls = canHaveNulls && nulls != null;
 
         int numRows = 0;
 

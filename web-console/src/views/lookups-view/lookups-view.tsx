@@ -355,7 +355,11 @@ export class LookupsView extends React.PureComponent<LookupsViewProps, LookupsVi
       <ReactTable
         data={lookups}
         loading={lookupEntriesAndTiersState.loading}
-        noDataText={lookupEntriesAndTiersState.getErrorMessage() || 'No lookups'}
+        noDataText={
+          !lookupEntriesAndTiersState.loading && !lookups.length
+            ? 'No lookups'
+            : lookupEntriesAndTiersState.getErrorMessage() || ''
+        }
         filterable
         filtered={lookupFilter}
         onFilteredChange={filtered => {

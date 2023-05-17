@@ -19,8 +19,6 @@
 import { render } from '@testing-library/react';
 import React from 'react';
 
-import { Capabilities } from '../../helpers';
-
 import { RetentionDialog } from './retention-dialog';
 
 describe('RetentionDialog', () => {
@@ -37,7 +35,7 @@ describe('RetentionDialog', () => {
           },
         ]}
         defaultRules={[{ tieredReplicants: { _default_tier: 2 }, type: 'loadForever' }]}
-        capabilities={Capabilities.FULL}
+        tiers={['tier1', 'tier2']}
         onEditDefaults={() => {}}
         onCancel={() => {}}
         onSave={() => {}}

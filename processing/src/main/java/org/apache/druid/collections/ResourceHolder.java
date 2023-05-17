@@ -22,7 +22,6 @@ package org.apache.druid.collections;
 import java.io.Closeable;
 
 /**
- *
  */
 public interface ResourceHolder<T> extends Closeable
 {
@@ -30,9 +29,4 @@ public interface ResourceHolder<T> extends Closeable
 
   @Override
   void close();
-
-  static <T extends Closeable> ResourceHolder<T> fromCloseable(final T resource)
-  {
-    return new CloseableResourceHolder<>(resource);
-  }
 }

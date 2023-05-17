@@ -173,7 +173,7 @@ public class ClosedSegmensSinksBatchAppenderatorTester implements AutoCloseable
         maxRowsInMemory,
         maxSizeInBytes == 0L ? getDefaultMaxBytesInMemory() : maxSizeInBytes,
         skipBytesInMemoryOverheadCheck,
-        IndexSpec.DEFAULT,
+        new IndexSpec(),
         0,
         false,
         0L,

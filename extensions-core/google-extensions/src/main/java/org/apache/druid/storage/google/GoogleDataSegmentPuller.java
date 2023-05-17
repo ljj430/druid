@@ -83,14 +83,14 @@ public class GoogleDataSegmentPuller implements URIDataPuller
   public InputStream getInputStream(URI uri) throws IOException
   {
     String path = StringUtils.maybeRemoveLeadingSlash(uri.getPath());
-    return storage.get(uri.getHost() != null ? uri.getHost() : uri.getAuthority(), path);
+    return storage.get(uri.getHost(), path);
   }
 
   @Override
   public String getVersion(URI uri) throws IOException
   {
     String path = StringUtils.maybeRemoveLeadingSlash(uri.getPath());
-    return storage.version(uri.getHost() != null ? uri.getHost() : uri.getAuthority(), path);
+    return storage.version(uri.getHost(), path);
   }
 
   @Override

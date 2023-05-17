@@ -20,6 +20,7 @@
 package org.apache.druid.msq.input.table;
 
 import com.google.common.collect.Iterators;
+import org.apache.druid.collections.ResourceHolder;
 import org.apache.druid.msq.counters.ChannelCounters;
 import org.apache.druid.msq.counters.CounterNames;
 import org.apache.druid.msq.counters.CounterTracker;
@@ -28,6 +29,7 @@ import org.apache.druid.msq.input.InputSliceReader;
 import org.apache.druid.msq.input.ReadableInput;
 import org.apache.druid.msq.input.ReadableInputs;
 import org.apache.druid.msq.querykit.DataSegmentProvider;
+import org.apache.druid.segment.Segment;
 import org.apache.druid.timeline.SegmentId;
 
 import java.util.Iterator;
@@ -90,10 +92,8 @@ public class SegmentsInputSliceReader implements InputSliceReader
               descriptor.getPartitionNumber()
           );
 
-          return new SegmentWithDescriptor(
-              dataSegmentProvider.fetchSegment(segmentId, channelCounters),
-              descriptor
-          );
+          final ResourceHolder<Segment> segmentHolder = dataSegmentProvider.fetchSegment(segmentId, channelCounters);
+          return new SegmentWithDescriptor(segmentHolder, descriptor);
         }
     ).iterator();
   }

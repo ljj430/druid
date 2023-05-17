@@ -19,6 +19,7 @@
 
 package org.apache.druid.common.gcp;
 
+import com.google.api.client.googleapis.testing.auth.oauth2.MockGoogleCredential;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
@@ -29,7 +30,7 @@ import com.google.inject.Provides;
 import org.apache.druid.guice.LazySingleton;
 import org.apache.druid.initialization.DruidModule;
 
-public abstract class GcpMockModule implements DruidModule
+public class GcpMockModule implements DruidModule
 {
   @Override
   public void configure(Binder binder)
@@ -38,18 +39,13 @@ public abstract class GcpMockModule implements DruidModule
 
   @Provides
   @LazySingleton
-  public HttpRequestInitializer provideRequestInitializer(
+  public HttpRequestInitializer mockRequestInitializer(
       HttpTransport transport,
       JsonFactory factory
   )
   {
-    return mockRequestInitializer(transport, factory);
+    return new MockGoogleCredential.Builder().setTransport(transport).setJsonFactory(factory).build();
   }
-
-  public abstract HttpRequestInitializer mockRequestInitializer(
-      HttpTransport transport,
-      JsonFactory factory
-  );
 
   @Provides
   @LazySingleton

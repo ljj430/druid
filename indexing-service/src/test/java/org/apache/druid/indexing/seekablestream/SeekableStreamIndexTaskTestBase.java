@@ -55,6 +55,7 @@ import org.apache.druid.indexing.common.LockGranularity;
 import org.apache.druid.indexing.common.SegmentCacheManagerFactory;
 import org.apache.druid.indexing.common.SingleFileTaskReportFileWriter;
 import org.apache.druid.indexing.common.TaskReport;
+import org.apache.druid.indexing.common.TaskStorageDirTracker;
 import org.apache.druid.indexing.common.TaskToolbox;
 import org.apache.druid.indexing.common.TaskToolboxFactory;
 import org.apache.druid.indexing.common.TestUtils;
@@ -63,7 +64,6 @@ import org.apache.druid.indexing.common.actions.TaskActionClientFactory;
 import org.apache.druid.indexing.common.actions.TaskActionToolbox;
 import org.apache.druid.indexing.common.actions.TaskAuditLogConfig;
 import org.apache.druid.indexing.common.config.TaskConfig;
-import org.apache.druid.indexing.common.config.TaskConfigBuilder;
 import org.apache.druid.indexing.common.config.TaskStorageConfig;
 import org.apache.druid.indexing.common.task.Task;
 import org.apache.druid.indexing.common.task.Tasks;
@@ -564,14 +564,23 @@ public abstract class SeekableStreamIndexTaskTestBase extends EasyMockSupport
   {
     final ObjectMapper objectMapper = testUtils.getTestObjectMapper();
     directory = tempFolder.newFolder();
-    final TaskConfig taskConfig =
-        new TaskConfigBuilder()
-            .setBaseDir(new File(directory, "baseDir").getPath())
-            .setBaseTaskDir(new File(directory, "baseTaskDir").getPath())
-            .setDefaultRowFlushBoundary(50000)
-            .setRestoreTasksOnRestart(true)
-            .setBatchProcessingMode(TaskConfig.BATCH_PROCESSING_MODE_DEFAULT.name())
-            .build();
+    final TaskConfig taskConfig = new TaskConfig(
+        new File(directory, "baseDir").getPath(),
+        new File(directory, "baseTaskDir").getPath(),
+        null,
+        50000,
+        null,
+        true,
+        null,
+        null,
+        null,
+        false,
+        false,
+        TaskConfig.BATCH_PROCESSING_MODE_DEFAULT.name(),
+        null,
+        false,
+        null
+    );
     final TestDerbyConnector derbyConnector = derby.getConnector();
     derbyConnector.createDataSourceTable();
     derbyConnector.createPendingSegmentsTable();
@@ -698,7 +707,8 @@ public abstract class SeekableStreamIndexTaskTestBase extends EasyMockSupport
         null,
         null,
         null,
-        "1"
+        "1",
+        new TaskStorageDirTracker(taskConfig)
     );
   }
 

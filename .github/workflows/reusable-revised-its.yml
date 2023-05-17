@@ -76,8 +76,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup java
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME_${{ inputs.build_jdk }}_X64" >> $GITHUB_ENV
+        run: export JAVA_HOME=$JAVA_HOME_${{ inputs.build_jdk }}_X64
 
       - name: Restore Maven repository
         id: maven-restore

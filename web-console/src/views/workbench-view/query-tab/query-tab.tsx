@@ -274,24 +274,7 @@ export const QueryTab = React.memo(function QueryTab(props: QueryTabProps) {
   }
 
   const handleRun = usePermanentCallback(async (preview: boolean) => {
-    const queryIssue = query.getIssue();
-    if (queryIssue) {
-      const position = WorkbenchQuery.getRowColumnFromIssue(queryIssue);
-
-      AppToaster.show({
-        icon: IconNames.ERROR,
-        intent: Intent.DANGER,
-        timeout: 90000,
-        message: queryIssue,
-        action: position
-          ? {
-              text: 'Go to issue',
-              onClick: () => moveToPosition(position),
-            }
-          : undefined,
-      });
-      return;
-    }
+    if (!query.isValid()) return;
 
     if (query.getEffectiveEngine() !== 'sql-msq-task') {
       WorkbenchHistory.addQueryToHistory(query);

@@ -247,19 +247,10 @@ public class InputSourceSampler
           if (!SamplerInputRow.SAMPLER_ORDERING_COLUMN.equals(dimensionDesc.getName())) {
             final ColumnType columnType = dimensionDesc.getCapabilities().toColumnType();
             signatureBuilder.add(dimensionDesc.getName(), columnType);
-            // use explicitly specified dimension schema if it exists
-            if (dataSchema != null &&
-                dataSchema.getDimensionsSpec() != null &&
-                dataSchema.getDimensionsSpec().getSchema(dimensionDesc.getName()) != null) {
-              logicalDimensionSchemas.add(dataSchema.getDimensionsSpec().getSchema(dimensionDesc.getName()));
-            } else {
-              logicalDimensionSchemas.add(
-                  DimensionSchema.getDefaultSchemaForBuiltInType(
-                      dimensionDesc.getName(),
-                      dimensionDesc.getCapabilities()
-                  )
-              );
-            }
+            // for now, use legacy types instead of standard type
+            logicalDimensionSchemas.add(
+                DimensionSchema.getDefaultSchemaForBuiltInType(dimensionDesc.getName(), dimensionDesc.getCapabilities())
+            );
             physicalDimensionSchemas.add(
                 dimensionDesc.getIndexer().getFormat().getColumnSchema(dimensionDesc.getName())
             );

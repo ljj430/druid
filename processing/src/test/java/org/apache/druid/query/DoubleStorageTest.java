@@ -358,7 +358,7 @@ public class DoubleStorageTest
     File someTmpFile = File.createTempFile("billy", "yay");
     someTmpFile.delete();
     FileUtils.mkdirp(someTmpFile);
-    INDEX_MERGER_V9.persist(index, someTmpFile, IndexSpec.DEFAULT, null);
+    INDEX_MERGER_V9.persist(index, someTmpFile, new IndexSpec(), null);
     someTmpFile.delete();
     return INDEX_IO.loadIndex(someTmpFile);
   }

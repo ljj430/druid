@@ -162,7 +162,7 @@ public class KinesisIndexTask extends SeekableStreamIndexTask<String, String, By
   public Set<ResourceAction> getInputSourceResources()
   {
     return Collections.singleton(new ResourceAction(
-        new Resource(INPUT_SOURCE_TYPE, ResourceType.EXTERNAL),
+        new Resource(ResourceType.EXTERNAL, INPUT_SOURCE_TYPE),
         Action.READ
     ));
   }

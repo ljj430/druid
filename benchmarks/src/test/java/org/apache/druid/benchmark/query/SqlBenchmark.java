@@ -457,7 +457,15 @@ public class SqlBenchmark
     final QueryableIndex index = segmentGenerator.generate(
         dataSegment,
         schemaInfo,
-        IndexSpec.builder().withStringDictionaryEncoding(encodingStrategy).build(),
+        new IndexSpec(
+            null,
+            null,
+            encodingStrategy,
+            null,
+            null,
+            null,
+            null
+        ),
         Granularities.NONE,
         rowsPerSegment
     );

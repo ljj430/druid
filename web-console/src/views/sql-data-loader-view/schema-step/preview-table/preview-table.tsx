@@ -30,13 +30,7 @@ import { BracedText, Deferred, TableCell } from '../../../../components';
 import { CellFilterMenu } from '../../../../components/cell-filter-menu/cell-filter-menu';
 import { ShowValueDialog } from '../../../../dialogs/show-value-dialog/show-value-dialog';
 import type { QueryAction } from '../../../../utils';
-import {
-  columnToIcon,
-  columnToSummary,
-  columnToWidth,
-  filterMap,
-  getNumericColumnBraces,
-} from '../../../../utils';
+import { columnToIcon, columnToWidth, filterMap, getNumericColumnBraces } from '../../../../utils';
 
 import './preview-table.scss';
 
@@ -130,7 +124,7 @@ export const PreviewTable = React.memo(function PreviewTable(props: PreviewTable
             Header() {
               return (
                 <div className="header-wrapper" onClick={() => onEditColumn(i)}>
-                  <div className="output-name" title={columnToSummary(column)}>
+                  <div className="output-name">
                     {icon && <Icon className="type-icon" icon={icon} size={12} />}
                     {h}
                     {hasFilterOnHeader(h, i) && (

@@ -132,7 +132,7 @@ final class LimitedSequence<T> extends YieldingSequenceBase<T>
         interruptYield = false;
       }
       if (interruptYield) {
-        this.yield();
+        yield();
       }
 
       return retVal;

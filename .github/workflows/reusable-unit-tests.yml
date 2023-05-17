@@ -54,8 +54,7 @@ jobs:
           fetch-depth: 0
 
       - name: setup jdk${{ inputs.jdk }}
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME_${{ inputs.jdk }}_X64" >> $GITHUB_ENV
+        run: export JAVA_HOME=$JAVA_HOME_${{ inputs.jdk }}_X64
 
       - name: Restore Maven repository
         id: maven-restore
@@ -99,5 +98,4 @@ jobs:
       - name: test & coverage
         env:
           MAVEN_PROJECTS: ${{ inputs.maven_projects }}
-        run: |
-          ./.github/scripts/unit_tests_script.sh
+        run: ./.github/scripts/unit_tests_script.sh

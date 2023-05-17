@@ -134,8 +134,8 @@ public class KinesisIndexTaskSerdeTest
     Assert.assertEquals(
         Collections.singleton(
             new ResourceAction(new Resource(
-                KinesisIndexTask.INPUT_SOURCE_TYPE,
-                ResourceType.EXTERNAL
+                ResourceType.EXTERNAL,
+                KinesisIndexTask.INPUT_SOURCE_TYPE
             ), Action.READ)),
         target.getInputSourceResources()
     );

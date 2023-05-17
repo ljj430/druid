@@ -161,7 +161,7 @@ public class DruidJsonValidatorTest
                 null,
                 null,
                 new DynamicPartitionsSpec(10000, null),
-                IndexSpec.DEFAULT,
+                new IndexSpec(),
                 null,
                 3,
                 false,

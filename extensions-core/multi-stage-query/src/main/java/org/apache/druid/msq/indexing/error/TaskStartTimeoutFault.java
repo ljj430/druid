@@ -32,43 +32,33 @@ public class TaskStartTimeoutFault extends BaseMSQFault
 {
   static final String CODE = "TaskStartTimeout";
 
-  private final int numTasksNotStarted;
-  private final int totalTasks;
+  private final int numTasks;
   private final long timeout;
 
   @JsonCreator
   public TaskStartTimeoutFault(
-      @JsonProperty("numTasksNotStarted") int numTasksNotStarted,
-      @JsonProperty("totalTasks") int totalTasks,
+      @JsonProperty("numTasks") int numTasks,
       @JsonProperty("timeout") long timeout
   )
   {
     super(
         CODE,
-        "Unable to launch [%d] workers out of the total [%d] worker tasks within [%,d] seconds of the last successful worker launch."
+        "Unable to launch [%d] worker tasks within [%,d] seconds. "
         + "There might be insufficient available slots to start all worker tasks simultaneously. "
         + "Try lowering '%s' in your query context to a number that fits within your available task capacity, "
         + "or try increasing capacity.",
-        numTasksNotStarted,
-        totalTasks,
+        numTasks,
         TimeUnit.MILLISECONDS.toSeconds(timeout),
         MultiStageQueryContext.CTX_MAX_NUM_TASKS
     );
-    this.numTasksNotStarted = numTasksNotStarted;
-    this.totalTasks = totalTasks;
+    this.numTasks = numTasks;
     this.timeout = timeout;
   }
 
   @JsonProperty
-  public int getNumTasksNotStarted()
+  public int getNumTasks()
   {
-    return numTasksNotStarted;
-  }
-
-  @JsonProperty
-  public int getTotalTasks()
-  {
-    return totalTasks;
+    return numTasks;
   }
 
   @JsonProperty
@@ -90,14 +80,21 @@ public class TaskStartTimeoutFault extends BaseMSQFault
       return false;
     }
     TaskStartTimeoutFault that = (TaskStartTimeoutFault) o;
-    return numTasksNotStarted == that.numTasksNotStarted && totalTasks == that.totalTasks && timeout == that.timeout;
+    return numTasks == that.numTasks && timeout == that.timeout;
   }
 
   @Override
   public int hashCode()
   {
-    return Objects.hash(super.hashCode(), numTasksNotStarted, totalTasks, timeout);
+    return Objects.hash(super.hashCode(), numTasks, timeout);
   }
 
-
+  @Override
+  public String toString()
+  {
+    return "TaskStartTimeoutFault{" +
+           "numTasks=" + numTasks +
+           ", timeout=" + timeout +
+           '}';
+  }
 }

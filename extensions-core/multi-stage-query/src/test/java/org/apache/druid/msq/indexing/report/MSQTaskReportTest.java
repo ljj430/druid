@@ -23,7 +23,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.druid.frame.key.ClusterBy;
 import org.apache.druid.frame.key.KeyColumn;
 import org.apache.druid.frame.key.KeyOrder;
@@ -52,7 +51,6 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -103,8 +101,8 @@ public class MSQTaskReportTest
             ),
             new CounterSnapshotsTree(),
             new MSQResultsReport(
-                Collections.singletonList(new MSQResultsReport.ColumnAndType("s", ColumnType.STRING)),
-                ImmutableList.of(SqlTypeName.VARCHAR),
+                RowSignature.builder().add("s", ColumnType.STRING).build(),
+                ImmutableList.of("VARCHAR"),
                 Yielders.each(Sequences.simple(results))
             )
         )

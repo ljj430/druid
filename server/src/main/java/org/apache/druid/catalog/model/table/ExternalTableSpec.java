@@ -19,13 +19,11 @@
 
 package org.apache.druid.catalog.model.table;
 
-import com.google.common.base.Supplier;
 import org.apache.druid.data.input.InputFormat;
 import org.apache.druid.data.input.InputSource;
 import org.apache.druid.segment.column.RowSignature;
 
 import javax.annotation.Nullable;
-import java.util.Set;
 
 /**
  * Catalog form of an external table specification used to pass along the three
@@ -38,17 +36,17 @@ public class ExternalTableSpec
   public final InputSource inputSource;
   public final InputFormat inputFormat;
   @Nullable public final RowSignature signature;
-  public final Supplier<Set<String>> inputSourceTypesSupplier;
+  public final String inputSourceType;
 
   public ExternalTableSpec(
       final InputSource inputSource,
       final InputFormat inputFormat,
       final RowSignature signature,
-      final Supplier<Set<String>> inputSourceTypesSupplier)
+      final String inputSourceType)
   {
     this.inputSource = inputSource;
     this.inputFormat = inputFormat;
     this.signature = signature;
-    this.inputSourceTypesSupplier = inputSourceTypesSupplier;
+    this.inputSourceType = inputSourceType;
   }
 }

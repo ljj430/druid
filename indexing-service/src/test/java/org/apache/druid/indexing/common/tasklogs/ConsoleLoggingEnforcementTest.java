@@ -24,7 +24,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.appender.ConsoleAppender;
-import org.apache.logging.log4j.core.appender.HttpAppender;
 import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.Assert;
@@ -80,9 +79,9 @@ public class ConsoleLoggingEnforcementTest
     // this logger configuration has no console logger appender, a default one will be created
     String log4jConfiguration = "<Configuration status=\"WARN\">\n"
                                 + "  <Appenders>\n"
-                                + "    <Http name=\"Http\" url=\"http://localhost:9200/\">\n"
-                                + "      <JsonLayout properties=\"true\"/>\n"
-                                + "    </Http>\n"
+                                + "    <RollingRandomAccessFile name=\"FileAppender\" fileName=\"a.log\">\n"
+                                + "      <PatternLayout pattern=\"%d{ISO8601} %p [%t] %c - %m%n\"/>\n"
+                                + "    </RollingRandomAccessFile>\n"
                                 + "  </Appenders>\n"
                                 + "  <Loggers>\n"
                                 + "    <Root level=\"info\">\n"
@@ -116,13 +115,13 @@ public class ConsoleLoggingEnforcementTest
                                 + "    <Console name=\"Console\" target=\"SYSTEM_OUT\">\n"
                                 + "      <PatternLayout pattern=\"%m\"/>\n"
                                 + "    </Console>\n"
-                                + "    <Http name=\"Http\" url=\"http://localhost:9200/\">\n"
-                                + "      <JsonLayout properties=\"true\"/>\n"
-                                + "    </Http>\n"
+                                + "    <RollingRandomAccessFile name=\"FileAppender\" fileName=\"a.log\">\n"
+                                + "      <PatternLayout pattern=\"%d{ISO8601} %p [%t] %c - %m%n\"/>\n"
+                                + "    </RollingRandomAccessFile>\n"
                                 + "  </Appenders>\n"
                                 + "  <Loggers>\n"
                                 + "    <Root level=\"info\">\n"
-                                + "      <AppenderRef ref=\"Http\"/>\n"
+                                + "      <AppenderRef ref=\"FileAppender\"/>\n"
                                 + "    </Root>\n"
                                 + "  </Loggers>\n"
                                 + "</Configuration>";
@@ -153,17 +152,17 @@ public class ConsoleLoggingEnforcementTest
                                 + "    <Console name=\"Console\" target=\"SYSTEM_OUT\">\n"
                                 + "      <PatternLayout pattern=\"%m\"/>\n"
                                 + "    </Console>\n"
-                                + "    <Http name=\"Http\" url=\"http://localhost:9200/\">\n"
-                                + "      <JsonLayout properties=\"true\"/>\n"
-                                + "    </Http>\n"
+                                + "    <RollingRandomAccessFile name=\"FileAppender\" fileName=\"a.log\">\n"
+                                + "      <PatternLayout pattern=\"%d{ISO8601} %p [%t] %c - %m%n\"/>\n"
+                                + "    </RollingRandomAccessFile>\n"
                                 + "  </Appenders>\n"
                                 + "  <Loggers>\n"
                                 + "    <Root level=\"info\">\n"
-                                + "      <AppenderRef ref=\"Http\"/>\n"
+                                + "      <AppenderRef ref=\"FileAppender\"/>\n"
                                 + "      <AppenderRef ref=\"Console\"/>\n"
                                 + "    </Root>\n"
                                 + "    <Logger level=\"debug\" name=\"org.apache.druid\" additivity=\"false\">\n"
-                                + "      <AppenderRef ref=\"Http\"/>\n"
+                                + "      <AppenderRef ref=\"FileAppender\"/>\n"
                                 + "      <AppenderRef ref=\"Console\"/>\n"
                                 + "    </Logger>\n"
                                 + "  </Loggers>\n"
@@ -172,10 +171,10 @@ public class ConsoleLoggingEnforcementTest
     LoggerContext context = enforceConsoleLogger(log4jConfiguration);
 
     // this logger is not defined in configuration, it derivates ROOT logger configuration
-    assertHasConsoleAppenderAndHttpAppender(getLogger(context, "name_not_in_config"), Level.INFO);
+    assertHasOnlyOneConsoleAppender(getLogger(context, "name_not_in_config"), Level.INFO);
 
-    assertHasConsoleAppenderAndHttpAppender(getLogger(context, "org.apache.druid"), Level.DEBUG);
-    assertHasConsoleAppenderAndHttpAppender(getLogger(context, ROOT), Level.INFO);
+    assertHasOnlyOneConsoleAppender(getLogger(context, "org.apache.druid"), Level.DEBUG);
+    assertHasOnlyOneConsoleAppender(getLogger(context, ROOT), Level.INFO);
 
     // the ConsoleAppender should be exactly the same as it's in the configuration
     PatternLayout layout = (PatternLayout) getLogger(context, "anything").getAppenders()
@@ -196,15 +195,15 @@ public class ConsoleLoggingEnforcementTest
                                 + "    <Console name=\"Console\" target=\"SYSTEM_OUT\">\n"
                                 + "      <PatternLayout pattern=\"%m\"/>\n"
                                 + "    </Console>\n"
-                                + "    <Http name=\"Http\" url=\"http://localhost:9200/\">\n"
-                                + "      <JsonLayout properties=\"true\"/>\n"
-                                + "    </Http>\n"
+                                + "    <RollingRandomAccessFile name=\"FileAppender\" fileName=\"a.log\">\n"
+                                + "      <PatternLayout pattern=\"%d{ISO8601} %p [%t] %c - %m%n\"/>\n"
+                                + "    </RollingRandomAccessFile>\n"
                                 + "  </Appenders>\n"
                                 + "  <Loggers>\n"
                                 + "    <Root level=\"info\">\n"
                                 + "    </Root>\n"
                                 + "    <Logger level=\"debug\" name=\"org.apache.druid\" additivity=\"false\">\n"
-                                + "      <AppenderRef ref=\"Http\"/>\n"
+                                + "      <AppenderRef ref=\"FileAppender\"/>\n"
                                 + "      <AppenderRef ref=\"Console\"/>\n"
                                 + "    </Logger>\n"
                                 + "  </Loggers>\n"
@@ -215,7 +214,7 @@ public class ConsoleLoggingEnforcementTest
     // this logger is not defined in configuration, it derivates ROOT logger configuration
     assertHasOnlyOneConsoleAppender(getLogger(context, "name_not_in_config"), Level.INFO);
 
-    assertHasConsoleAppenderAndHttpAppender(getLogger(context, "org.apache.druid"), Level.DEBUG);
+    assertHasOnlyOneConsoleAppender(getLogger(context, "org.apache.druid"), Level.DEBUG);
     assertHasOnlyOneConsoleAppender(getLogger(context, ROOT), Level.INFO);
 
     // the ConsoleAppender should be exactly the same as it's in the configuration
@@ -236,20 +235,6 @@ public class ConsoleLoggingEnforcementTest
     // enforce the console logging for current configuration
     context.reconfigure(new ConsoleLoggingEnforcementConfigurationFactory().getConfiguration(context, source));
     return context;
-  }
-
-  private void assertHasConsoleAppenderAndHttpAppender(Logger logger, Level level)
-  {
-    // there's two appenders
-    Assert.assertEquals(2, logger.getAppenders().size());
-
-    // and the appenders must be ConsoleAppender and HttpAppender
-    Assert.assertEquals(ConsoleAppender.class, logger.getAppenders().get("Console").getClass());
-    Assert.assertEquals(HttpAppender.class, logger.getAppenders().get("Http").getClass());
-
-    if (level != null) {
-      Assert.assertEquals(level, logger.getLevel());
-    }
   }
 
   private void assertHasOnlyOneConsoleAppender(Logger logger, Level level)

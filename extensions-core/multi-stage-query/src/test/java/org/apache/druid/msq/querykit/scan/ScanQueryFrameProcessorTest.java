@@ -22,7 +22,6 @@ package org.apache.druid.msq.querykit.scan;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
-import org.apache.druid.collections.ReferenceCountingResourceHolder;
 import org.apache.druid.collections.ResourceHolder;
 import org.apache.druid.frame.Frame;
 import org.apache.druid.frame.FrameType;
@@ -39,11 +38,13 @@ import org.apache.druid.frame.write.FrameWriterFactory;
 import org.apache.druid.frame.write.FrameWriters;
 import org.apache.druid.jackson.DefaultObjectMapper;
 import org.apache.druid.java.util.common.Intervals;
+import org.apache.druid.java.util.common.Pair;
 import org.apache.druid.java.util.common.concurrent.Execs;
 import org.apache.druid.java.util.common.guava.Sequence;
 import org.apache.druid.msq.input.ReadableInput;
 import org.apache.druid.msq.kernel.StageId;
 import org.apache.druid.msq.kernel.StagePartition;
+import org.apache.druid.msq.querykit.LazyResourceHolder;
 import org.apache.druid.msq.test.LimitedFrameWriterFactory;
 import org.apache.druid.query.Druids;
 import org.apache.druid.query.scan.ScanQuery;
@@ -51,6 +52,8 @@ import org.apache.druid.query.spec.MultipleIntervalSegmentSpec;
 import org.apache.druid.segment.TestIndex;
 import org.apache.druid.segment.column.RowSignature;
 import org.apache.druid.segment.incremental.IncrementalIndexStorageAdapter;
+import org.apache.druid.segment.join.JoinableFactoryWrapper;
+import org.apache.druid.segment.join.NoopJoinableFactory;
 import org.apache.druid.testing.InitializedNullHandlingTest;
 import org.junit.After;
 import org.junit.Assert;
@@ -127,6 +130,7 @@ public class ScanQueryFrameProcessorTest extends InitializedNullHandlingTest
         query,
         ReadableInput.channel(inputChannel.readable(), FrameReader.create(signature), stagePartition),
         Int2ObjectMaps.emptyMap(),
+        new JoinableFactoryWrapper(NoopJoinableFactory.INSTANCE),
         new ResourceHolder<WritableFrameChannel>()
         {
           @Override
@@ -146,7 +150,7 @@ public class ScanQueryFrameProcessorTest extends InitializedNullHandlingTest
             }
           }
         },
-        new ReferenceCountingResourceHolder<>(frameWriterFactory, () -> {}),
+        new LazyResourceHolder<>(() -> Pair.of(frameWriterFactory, () -> {})),
         null,
         0L,
         new DefaultObjectMapper()

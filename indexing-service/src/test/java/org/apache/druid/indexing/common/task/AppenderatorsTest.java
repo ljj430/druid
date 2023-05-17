@@ -169,7 +169,7 @@ public class AppenderatorsTest
           maxRowsInMemory,
           maxSizeInBytes == 0L ? getDefaultMaxBytesInMemory() : maxSizeInBytes,
           skipBytesInMemoryOverheadCheck,
-          IndexSpec.DEFAULT,
+          new IndexSpec(),
           0,
           false,
           0L,

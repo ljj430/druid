@@ -34,8 +34,6 @@ import org.apache.druid.msq.indexing.error.MSQException;
 import org.apache.druid.msq.indexing.error.MSQFault;
 import org.apache.druid.msq.indexing.error.MSQFaultUtils;
 import org.apache.druid.msq.indexing.error.QueryRuntimeFault;
-import org.apache.druid.msq.indexing.error.TooManyAttemptsForJob;
-import org.apache.druid.msq.indexing.error.TooManyAttemptsForWorker;
 import org.apache.druid.msq.indexing.error.UnknownFault;
 import org.apache.druid.msq.indexing.error.WorkerFailedFault;
 import org.apache.druid.msq.indexing.error.WorkerRpcFailedFault;
@@ -203,10 +201,7 @@ public class MSQTasks
       // function, and it's best if helper functions run quietly.)
       if (workerErrorReport != null && (controllerErrorReport.getFault() instanceof WorkerFailedFault
                                         || controllerErrorReport.getFault() instanceof WorkerRpcFailedFault
-                                        || controllerErrorReport.getFault() instanceof CanceledFault
-                                        || controllerErrorReport.getFault() instanceof TooManyAttemptsForWorker
-                                        || controllerErrorReport.getFault() instanceof TooManyAttemptsForJob)) {
-
+                                        || controllerErrorReport.getFault() instanceof CanceledFault)) {
         return workerErrorReport;
       } else {
         return controllerErrorReport;

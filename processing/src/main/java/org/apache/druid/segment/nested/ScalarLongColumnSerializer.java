@@ -45,9 +45,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.WritableByteChannel;
 
-/**
- * Serializer for a {@link ScalarLongColumn}
- */
 public class ScalarLongColumnSerializer extends NestedCommonFormatColumnSerializer
 {
   private static final Logger log = new Logger(ScalarLongColumnSerializer.class);
@@ -176,7 +173,6 @@ public class ScalarLongColumnSerializer extends NestedCommonFormatColumnSerializ
     // null is always 0
     longDictionaryWriter.write(null);
     dictionaryIdLookup.addNumericNull();
-
     for (Long value : longs) {
       if (value == null) {
         continue;

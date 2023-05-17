@@ -19,6 +19,7 @@
 
 package org.apache.druid.k8s.overlord.common;
 
+import com.google.common.base.Optional;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import org.apache.druid.java.util.common.DateTimes;
 import org.apache.druid.java.util.emitter.EmittingLogger;
@@ -27,8 +28,10 @@ import org.joda.time.PeriodType;
 
 import javax.annotation.Nullable;
 
+
 public class JobResponse
 {
+
   private static final EmittingLogger LOGGER = new EmittingLogger(JobResponse.class);
 
   private final Job job;
@@ -50,23 +53,28 @@ public class JobResponse
     return phase;
   }
 
-  public long getJobDuration()
+  public Optional<Long> getJobDuration()
   {
-    long duration = -1L;
+    Optional<Long> duration = Optional.absent();
     String jobName = job != null && job.getMetadata() != null ? job.getMetadata().getName() : "";
     try {
       if (job != null && job.getStatus() != null
           && job.getStatus().getStartTime() != null
           && job.getStatus().getCompletionTime() != null) {
-        duration = new Period(
+        duration = Optional.of((long) new Period(
             DateTimes.of(job.getStatus().getStartTime()),
             DateTimes.of(job.getStatus().getCompletionTime()),
             PeriodType.millis()
-        ).getMillis();
+        ).getMillis());
       }
     }
     catch (Exception e) {
       LOGGER.error(e, "Error calculating duration for job: %s", jobName);
+    }
+    if (duration.isPresent()) {
+      LOGGER.info("Duration for Job: %s was %d seconds", jobName, duration.get());
+    } else {
+      LOGGER.info("Unable to calcuate duration for Job: %s", jobName);
     }
     return duration;
   }

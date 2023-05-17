@@ -94,9 +94,10 @@ public class CalciteSelectQueryMSQTest extends CalciteQueryTest
   protected QueryTestBuilder testBuilder()
   {
     return new QueryTestBuilder(new CalciteTestConfig(true))
+        .addCustomVerification(new VerifyMSQSupportedNativeQueriesFactory())
         .addCustomRunner(new ExtractResultsFactory(() -> (MSQTestOverlordServiceClient) ((MSQTaskSqlEngine) queryFramework().engine()).overlordClient()))
         .skipVectorize(true)
-        .verifyNativeQueries(new VerifyMSQSupportedNativeQueriesPredicate())
+        .verifyNativeQueries(false)
         .msqCompatible(msqCompatible);
   }
 
@@ -171,6 +172,7 @@ public class CalciteSelectQueryMSQTest extends CalciteQueryTest
   @Override
   public void testArrayAggQueryOnComplexDatatypes()
   {
+    msqCompatible();
     try {
       testQuery("SELECT ARRAY_AGG(unique_dim1) FROM druid.foo", ImmutableList.of(), ImmutableList.of());
       Assert.fail("query execution should fail");

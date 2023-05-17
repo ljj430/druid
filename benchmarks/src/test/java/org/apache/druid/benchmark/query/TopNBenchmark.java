@@ -308,7 +308,7 @@ public class TopNBenchmark
         File indexFile = INDEX_MERGER_V9.persist(
             incIndex,
             new File(qIndexesDir, String.valueOf(i)),
-            IndexSpec.DEFAULT,
+            new IndexSpec(),
             null
         );
         incIndex.close();

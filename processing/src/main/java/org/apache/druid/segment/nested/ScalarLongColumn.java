@@ -20,7 +20,6 @@
 package org.apache.druid.segment.nested;
 
 import org.apache.druid.collections.bitmap.ImmutableBitmap;
-import org.apache.druid.common.config.NullHandling;
 import org.apache.druid.query.monomorphicprocessing.RuntimeShapeInspector;
 import org.apache.druid.segment.ColumnValueSelector;
 import org.apache.druid.segment.LongColumnSelector;
@@ -38,9 +37,6 @@ import org.roaringbitmap.PeekableIntIterator;
 
 import javax.annotation.Nullable;
 
-/**
- * {@link NestedCommonFormatColumn} for {@link ColumnType#LONG}
- */
 public class ScalarLongColumn implements NestedCommonFormatColumn
 {
   private final FixedIndexed<Long> longDictionary;
@@ -96,9 +92,6 @@ public class ScalarLongColumn implements NestedCommonFormatColumn
       @Override
       public boolean isNull()
       {
-        if (NullHandling.replaceWithDefault()) {
-          return false;
-        }
         final int i = offset.getOffset();
         if (i < offsetMark) {
           // offset was reset, reset iterator state
@@ -142,9 +135,6 @@ public class ScalarLongColumn implements NestedCommonFormatColumn
       @Override
       public boolean[] getNullVector()
       {
-        if (NullHandling.replaceWithDefault()) {
-          return null;
-        }
         computeVectorsIfNeeded();
         return nullVector;
       }

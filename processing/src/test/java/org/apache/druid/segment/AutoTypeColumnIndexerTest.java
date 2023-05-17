@@ -68,70 +68,60 @@ public class AutoTypeColumnIndexerTest extends InitializedNullHandlingTest
   public void testKeySizeEstimation()
   {
     AutoTypeColumnIndexer indexer = new AutoTypeColumnIndexer();
-    int baseCardinality = NullHandling.sqlCompatible() ? 0 : 2;
-    Assert.assertEquals(baseCardinality, indexer.getCardinality());
+    Assert.assertEquals(0, indexer.getCardinality());
 
     EncodedKeyComponent<StructuredData> key;
     // new raw value, new field, new dictionary entry
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(ImmutableMap.of("x", "foo"), false);
     Assert.assertEquals(228, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 1, indexer.getCardinality());
+    Assert.assertEquals(1, indexer.getCardinality());
     // adding same value only adds estimated size of value itself
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(ImmutableMap.of("x", "foo"), false);
     Assert.assertEquals(112, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 1, indexer.getCardinality());
+    Assert.assertEquals(1, indexer.getCardinality());
     // new raw value, new field, new dictionary entry
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(10L, false);
     Assert.assertEquals(94, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 2, indexer.getCardinality());
+    Assert.assertEquals(2, indexer.getCardinality());
     // adding same value only adds estimated size of value itself
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(10L, false);
     Assert.assertEquals(16, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 2, indexer.getCardinality());
+    Assert.assertEquals(2, indexer.getCardinality());
     // new raw value, new dictionary entry
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(11L, false);
     Assert.assertEquals(48, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 3, indexer.getCardinality());
+    Assert.assertEquals(3, indexer.getCardinality());
 
     // new raw value, new fields
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(ImmutableList.of(1L, 2L, 10L), false);
     Assert.assertEquals(168, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 6, indexer.getCardinality());
+    Assert.assertEquals(6, indexer.getCardinality());
     // new raw value, re-use fields and dictionary
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(ImmutableList.of(1L, 2L, 10L), false);
     Assert.assertEquals(104, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 6, indexer.getCardinality());
+    Assert.assertEquals(6, indexer.getCardinality());
     // new raw value, new fields
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(
         ImmutableMap.of("x", ImmutableList.of(1L, 2L, 10L)),
         false
     );
     Assert.assertEquals(166, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 6, indexer.getCardinality());
+    Assert.assertEquals(6, indexer.getCardinality());
     // new raw value
     key = indexer.processRowValsToUnsortedEncodedKeyComponent(
         ImmutableMap.of("x", ImmutableList.of(1L, 2L, 10L)),
         false
     );
     Assert.assertEquals(166, key.getEffectiveSizeBytes());
-    Assert.assertEquals(baseCardinality + 6, indexer.getCardinality());
+    Assert.assertEquals(6, indexer.getCardinality());
 
     key = indexer.processRowValsToUnsortedEncodedKeyComponent("", false);
     if (NullHandling.replaceWithDefault()) {
       Assert.assertEquals(0, key.getEffectiveSizeBytes());
-      Assert.assertEquals(baseCardinality + 7, indexer.getCardinality());
+      Assert.assertEquals(7, indexer.getCardinality());
     } else {
       Assert.assertEquals(104, key.getEffectiveSizeBytes());
-      Assert.assertEquals(baseCardinality + 7, indexer.getCardinality());
-    }
-
-    key = indexer.processRowValsToUnsortedEncodedKeyComponent(0L, false);
-    if (NullHandling.replaceWithDefault()) {
-      Assert.assertEquals(16, key.getEffectiveSizeBytes());
-      Assert.assertEquals(baseCardinality + 7, indexer.getCardinality());
-    } else {
-      Assert.assertEquals(48, key.getEffectiveSizeBytes());
-      Assert.assertEquals(baseCardinality + 8, indexer.getCardinality());
+      Assert.assertEquals(7, indexer.getCardinality());
     }
   }
 
@@ -257,43 +247,20 @@ public class AutoTypeColumnIndexerTest extends InitializedNullHandlingTest
     columnSelectorFactory = cursorList.get(3).getColumnSelectorFactory();
     valueSelector = columnSelectorFactory.makeColumnValueSelector(LONG_COL);
     dimensionSelector = columnSelectorFactory.makeDimensionSelector(dimensionSpec);
-    if (NullHandling.sqlCompatible()) {
-      Assert.assertNull(valueSelector.getObject());
-      Assert.assertTrue(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
-      Assert.assertNull(dimensionSelector.getObject());
-    } else {
-      Assert.assertEquals(NullHandling.defaultLongValue(), valueSelector.getObject());
-      Assert.assertFalse(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertEquals(
-          String.valueOf(NullHandling.defaultLongValue()),
-          dimensionSelector.lookupName(dimensionSelector.getRow().get(0))
-      );
-      Assert.assertEquals(String.valueOf(NullHandling.defaultLongValue()), dimensionSelector.getObject());
-    }
-
+    Assert.assertNull(valueSelector.getObject());
+    Assert.assertTrue(valueSelector.isNull());
+    Assert.assertEquals(1, dimensionSelector.getRow().size());
+    Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
+    Assert.assertNull(dimensionSelector.getObject());
 
     columnSelectorFactory = cursorList.get(4).getColumnSelectorFactory();
     valueSelector = columnSelectorFactory.makeColumnValueSelector(LONG_COL);
     dimensionSelector = columnSelectorFactory.makeDimensionSelector(dimensionSpec);
-    if (NullHandling.sqlCompatible()) {
-      Assert.assertNull(valueSelector.getObject());
-      Assert.assertTrue(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
-      Assert.assertNull(dimensionSelector.getObject());
-    } else {
-      Assert.assertEquals(NullHandling.defaultLongValue(), valueSelector.getObject());
-      Assert.assertFalse(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertEquals(
-          String.valueOf(NullHandling.defaultLongValue()),
-          dimensionSelector.lookupName(dimensionSelector.getRow().get(0))
-      );
-      Assert.assertEquals(String.valueOf(NullHandling.defaultLongValue()), dimensionSelector.getObject());
-    }
+    Assert.assertNull(valueSelector.getObject());
+    Assert.assertTrue(valueSelector.isNull());
+    Assert.assertEquals(1, dimensionSelector.getRow().size());
+    Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
+    Assert.assertNull(dimensionSelector.getObject());
   }
 
   @Test
@@ -353,42 +320,18 @@ public class AutoTypeColumnIndexerTest extends InitializedNullHandlingTest
     columnSelectorFactory = cursorList.get(3).getColumnSelectorFactory();
     valueSelector = columnSelectorFactory.makeColumnValueSelector(DOUBLE_COL);
     dimensionSelector = columnSelectorFactory.makeDimensionSelector(dimensionSpec);
-    if (NullHandling.sqlCompatible()) {
-      Assert.assertNull(valueSelector.getObject());
-      Assert.assertTrue(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
-      Assert.assertNull(dimensionSelector.getObject());
-    } else {
-      Assert.assertEquals(NullHandling.defaultDoubleValue(), valueSelector.getObject());
-      Assert.assertFalse(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertEquals(
-          String.valueOf(NullHandling.defaultDoubleValue()),
-          dimensionSelector.lookupName(dimensionSelector.getRow().get(0))
-      );
-      Assert.assertEquals(String.valueOf(NullHandling.defaultDoubleValue()), dimensionSelector.getObject());
-    }
+    Assert.assertNull(valueSelector.getObject());
+    Assert.assertEquals(1, dimensionSelector.getRow().size());
+    Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
+    Assert.assertNull(dimensionSelector.getObject());
 
     columnSelectorFactory = cursorList.get(4).getColumnSelectorFactory();
     valueSelector = columnSelectorFactory.makeColumnValueSelector(DOUBLE_COL);
     dimensionSelector = columnSelectorFactory.makeDimensionSelector(dimensionSpec);
-    if (NullHandling.sqlCompatible()) {
-      Assert.assertNull(valueSelector.getObject());
-      Assert.assertTrue(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
-      Assert.assertNull(dimensionSelector.getObject());
-    } else {
-      Assert.assertEquals(NullHandling.defaultDoubleValue(), valueSelector.getObject());
-      Assert.assertFalse(valueSelector.isNull());
-      Assert.assertEquals(1, dimensionSelector.getRow().size());
-      Assert.assertEquals(
-          String.valueOf(NullHandling.defaultDoubleValue()),
-          dimensionSelector.lookupName(dimensionSelector.getRow().get(0))
-      );
-      Assert.assertEquals(String.valueOf(NullHandling.defaultDoubleValue()), dimensionSelector.getObject());
-    }
+    Assert.assertNull(valueSelector.getObject());
+    Assert.assertEquals(1, dimensionSelector.getRow().size());
+    Assert.assertNull(dimensionSelector.lookupName(dimensionSelector.getRow().get(0)));
+    Assert.assertNull(dimensionSelector.getObject());
   }
 
   @Test

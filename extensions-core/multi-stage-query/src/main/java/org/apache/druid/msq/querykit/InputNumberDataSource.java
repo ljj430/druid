@@ -83,7 +83,7 @@ public class InputNumberDataSource implements DataSource
   @Override
   public boolean isConcrete()
   {
-    return true;
+    return false;
   }
 
   @Override

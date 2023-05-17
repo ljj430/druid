@@ -78,13 +78,13 @@ public class CompactionTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, 100L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         false,
         true,
@@ -120,13 +120,13 @@ public class CompactionTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, 100L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         false,
         true,
@@ -163,13 +163,13 @@ public class CompactionTuningConfigTest
         null,
         null,
         new DynamicPartitionsSpec(100, 100L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.UNCOMPRESSED)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
-        IndexSpec.DEFAULT,
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.UNCOMPRESSED,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
+        new IndexSpec(),
         1,
         false,
         true,
@@ -196,11 +196,6 @@ public class CompactionTuningConfigTest
   public void testEqualsAndHashCode()
   {
     EqualsVerifier.forClass(CompactionTask.CompactionTuningConfig.class)
-                  .withPrefabValues(
-                      IndexSpec.class,
-                      IndexSpec.DEFAULT,
-                      IndexSpec.builder().withDimensionCompression(CompressionStrategy.ZSTD).build()
-                  )
                   .usingGetClass()
                   .verify();
   }

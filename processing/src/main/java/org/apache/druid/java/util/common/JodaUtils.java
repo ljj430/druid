@@ -45,11 +45,10 @@ public class JodaUtils
   public static final long MIN_INSTANT = Long.MIN_VALUE / 2;
 
   /**
-   * Condense the provided intervals such that the returned list has no abutting intervals, no overlapping intervals,
-   * and no zero-length intervals.
-   * <p>
-   * This method is most efficient if the input intervals are in a {@link SortedSet} whose comparator is
-   * {@link Comparators#intervalsByStartThenEnd()}.
+   * This method will not materialize the input intervals if they represent
+   * a SortedSet (i.e. implement that interface). If not, the method internally
+   * creates a sorted set and populates it with them thus materializing the
+   * intervals in the input.
    *
    * @param intervals The Iterable object containing the intervals to condense
    * @return The condensed intervals
@@ -58,8 +57,7 @@ public class JodaUtils
   {
     final SortedSet<Interval> sortedIntervals;
 
-    if (intervals instanceof SortedSet
-        && (Comparators.intervalsByStartThenEnd().equals(((SortedSet<Interval>) intervals).comparator()))) {
+    if (intervals instanceof SortedSet) {
       sortedIntervals = (SortedSet<Interval>) intervals;
     } else {
       sortedIntervals = new TreeSet<>(Comparators.intervalsByStartThenEnd());
@@ -71,39 +69,30 @@ public class JodaUtils
   }
 
   /**
-   * Condense the provided intervals such that the returned list has no abutting intervals, no overlapping intervals,
-   * and no zero-length intervals.
-   * <p>
-   * The provided intervals must be sorted in ascending order using {@link Comparators#intervalsByStartThenEnd()}.
-   * Otherwise, results are undefined.
-   * <p>
-   * The method avoids materialization by incrementally condensing the intervals by
+   * This method does not materialize the intervals represented by the
+   * sortedIntervals iterator. However, caller needs to insure that sortedIntervals
+   * is already sorted in ascending order (use the Comparators.intervalsByStartThenEnd()).
+   * It avoids materialization by incrementally condensing the intervals by
    * starting from the first and looking for "adjacent" intervals. This is
    * possible since intervals in the Iterator are in ascending order (as
    * guaranteed by the caller).
+   * <p>
+   * *
    *
    * @param sortedIntervals The iterator object containing the intervals to condense
-   *
    * @return An iterator for the condensed intervals. By construction the condensed intervals are sorted
    * in ascending order and contain no repeated elements. The iterator can contain nulls,
    * they will be skipped if it does.
-   *
    * @throws IAE if an element is null or if sortedIntervals is not sorted in ascending order
    */
   public static Iterator<Interval> condensedIntervalsIterator(Iterator<Interval> sortedIntervals)
   {
+
     if (sortedIntervals == null || !sortedIntervals.hasNext()) {
       return Collections.emptyIterator();
     }
 
-    final PeekingIterator<Interval> peekingIterator =
-        Iterators.peekingIterator(
-            Iterators.filter(
-                sortedIntervals,
-                interval -> interval == null || interval.toDurationMillis() > 0
-            )
-        );
-
+    final PeekingIterator<Interval> peekingIterator = Iterators.peekingIterator(sortedIntervals);
     return new Iterator<Interval>()
     {
       private Interval previous;
@@ -155,6 +144,34 @@ public class JodaUtils
         return currInterval;
       }
     };
+  }
+
+  /**
+   * Verify whether an iterable of intervals contains overlapping intervals
+   *
+   * @param intervals An interval iterable sorted using Comparators.intervalsByStartThenEnd()
+   * @return true if the iterable contains at least two overlapping intervals, false otherwise.
+   * @throws IAE when at least an element is null or when the iterable is not sorted
+   */
+  public static boolean containOverlappingIntervals(Iterable<Interval> intervals)
+  {
+    if (intervals == null) {
+      return false;
+    }
+    boolean retVal = false;
+    Interval previous = null;
+    for (Interval current : intervals) {
+      if (current == null) {
+        throw new IAE("Intervals should not contain nulls");
+      }
+      verifyAscendingSortOrder(previous, current);
+      if (previous != null && previous.overlaps(current)) {
+        retVal = true;
+        break;
+      }
+      previous = current;
+    }
+    return retVal;
   }
 
   private static void verifyAscendingSortOrder(Interval previous, Interval current)

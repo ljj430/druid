@@ -95,7 +95,7 @@ public class SpecificSegmentsQuerySegmentWalker implements QuerySegmentWalker, C
    */
   public SpecificSegmentsQuerySegmentWalker(
       final QueryRunnerFactoryConglomerate conglomerate,
-      final SegmentWrangler segmentWrangler,
+      final LookupExtractorFactoryContainerProvider lookupProvider,
       final JoinableFactoryWrapper joinableFactoryWrapper,
       final QueryScheduler scheduler
   )
@@ -108,7 +108,12 @@ public class SpecificSegmentsQuerySegmentWalker implements QuerySegmentWalker, C
         ),
         QueryStackTests.createLocalQuerySegmentWalker(
             conglomerate,
-            segmentWrangler,
+            new MapSegmentWrangler(
+                ImmutableMap.<Class<? extends DataSource>, SegmentWrangler>builder()
+                            .put(InlineDataSource.class, new InlineSegmentWrangler())
+                            .put(LookupDataSource.class, new LookupSegmentWrangler(lookupProvider))
+                            .build()
+            ),
             joinableFactoryWrapper,
             scheduler
         ),
@@ -126,15 +131,7 @@ public class SpecificSegmentsQuerySegmentWalker implements QuerySegmentWalker, C
   {
     this(
         conglomerate,
-        new MapSegmentWrangler(
-            ImmutableMap.<Class<? extends DataSource>, SegmentWrangler>builder()
-                        .put(InlineDataSource.class, new InlineSegmentWrangler())
-                        .put(
-                            LookupDataSource.class,
-                            new LookupSegmentWrangler(LOOKUP_EXTRACTOR_FACTORY_CONTAINER_PROVIDER)
-                        )
-                        .build()
-        ),
+        LOOKUP_EXTRACTOR_FACTORY_CONTAINER_PROVIDER,
         new JoinableFactoryWrapper(QueryStackTests.makeJoinableFactoryForLookup(LOOKUP_EXTRACTOR_FACTORY_CONTAINER_PROVIDER)),
         QueryStackTests.DEFAULT_NOOP_SCHEDULER
     );

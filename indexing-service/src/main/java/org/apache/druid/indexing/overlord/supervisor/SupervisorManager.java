@@ -132,7 +132,7 @@ public class SupervisorManager
             createAndStartSupervisorInternal(spec, false);
           }
           catch (Exception ex) {
-            log.error(ex, "Failed to start supervisor: id [%s]", spec.getId());
+            log.error(ex, "Failed to start supervisor: [%s]", spec.getId());
           }
         }
       }
@@ -313,6 +313,10 @@ public class SupervisorManager
       return false;
     }
 
+    if (persistSpec) {
+      metadataSupervisorManager.insert(id, spec);
+    }
+
     Supervisor supervisor;
     SupervisorTaskAutoScaler autoscaler;
     try {
@@ -322,22 +326,18 @@ public class SupervisorManager
       supervisor.start();
       if (autoscaler != null) {
         autoscaler.start();
+        autoscalers.put(id, autoscaler);
       }
     }
     catch (Exception e) {
-      log.error("Failed to create and start supervisor: [%s]", spec.getId());
+      // Supervisor creation or start failed write tombstone only when trying to start a new supervisor
+      if (persistSpec) {
+        metadataSupervisorManager.insert(id, new NoopSupervisorSpec(null, spec.getDataSources()));
+      }
       throw new RuntimeException(e);
     }
 
-    if (persistSpec) {
-      metadataSupervisorManager.insert(id, spec);
-    }
-
     supervisors.put(id, Pair.of(supervisor, spec));
-    if (autoscaler != null) {
-      autoscalers.put(id, autoscaler);
-    }
-
     return true;
   }
 }

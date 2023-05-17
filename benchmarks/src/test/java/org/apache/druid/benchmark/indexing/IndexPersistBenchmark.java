@@ -189,7 +189,7 @@ public class IndexPersistBenchmark
     File indexFile = INDEX_MERGER_V9.persist(
         incIndex,
         tmpDir,
-        IndexSpec.DEFAULT,
+        new IndexSpec(),
         null
     );
 

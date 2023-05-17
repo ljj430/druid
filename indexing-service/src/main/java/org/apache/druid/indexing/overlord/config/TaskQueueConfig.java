@@ -21,7 +21,6 @@ package org.apache.druid.indexing.overlord.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.druid.common.config.Configs;
 import org.joda.time.Duration;
 import org.joda.time.Period;
 
@@ -47,7 +46,7 @@ public class TaskQueueConfig
       @JsonProperty("storageSyncRate") final Period storageSyncRate
   )
   {
-    this.maxSize = Configs.valueOrDefault(maxSize, Integer.MAX_VALUE);
+    this.maxSize = maxSize == null ? Integer.MAX_VALUE : maxSize;
     this.startDelay = defaultDuration(startDelay, "PT1M");
     this.restartDelay = defaultDuration(restartDelay, "PT30S");
     this.storageSyncRate = defaultDuration(storageSyncRate, "PT1M");

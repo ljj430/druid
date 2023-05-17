@@ -163,7 +163,6 @@ public class SystemSchema extends AbstractSchema
       .add("curr_size", ColumnType.LONG)
       .add("max_size", ColumnType.LONG)
       .add("is_leader", ColumnType.LONG)
-      .add("start_time", ColumnType.STRING)
       .build();
 
   static final RowSignature SERVER_SEGMENTS_SIGNATURE = RowSignature
@@ -596,8 +595,7 @@ public class SystemSchema extends AbstractSchema
           null,
           UNKNOWN_SIZE,
           UNKNOWN_SIZE,
-          NullHandling.defaultLongValue(),
-          toStringOrNull(discoveryDruidNode.getStartTime())
+          NullHandling.defaultLongValue()
       };
     }
 
@@ -616,8 +614,7 @@ public class SystemSchema extends AbstractSchema
           null,
           UNKNOWN_SIZE,
           UNKNOWN_SIZE,
-          isLeader ? 1L : 0L,
-          toStringOrNull(discoveryDruidNode.getStartTime())
+          isLeader ? 1L : 0L
       };
     }
 
@@ -651,8 +648,7 @@ public class SystemSchema extends AbstractSchema
           druidServerToUse.getTier(),
           currentSize,
           druidServerToUse.getMaxSize(),
-          NullHandling.defaultLongValue(),
-          toStringOrNull(discoveryDruidNode.getStartTime())
+          NullHandling.defaultLongValue()
       };
     }
 

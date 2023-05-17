@@ -48,7 +48,6 @@ import static org.apache.druid.msq.util.MultiStageQueryContext.CTX_ROWS_IN_MEMOR
 import static org.apache.druid.msq.util.MultiStageQueryContext.CTX_ROWS_PER_SEGMENT;
 import static org.apache.druid.msq.util.MultiStageQueryContext.CTX_SORT_ORDER;
 import static org.apache.druid.msq.util.MultiStageQueryContext.CTX_TASK_ASSIGNMENT_STRATEGY;
-import static org.apache.druid.msq.util.MultiStageQueryContext.CTX_USE_AUTO_SCHEMAS;
 import static org.apache.druid.msq.util.MultiStageQueryContext.DEFAULT_MAX_NUM_TASKS;
 
 public class MultiStageQueryContextTest
@@ -157,33 +156,27 @@ public class MultiStageQueryContextTest
   @Test
   public void getRowsPerSegment_noParameterSetReturnsDefaultValue()
   {
-    Assert.assertEquals(
-        MultiStageQueryContext.DEFAULT_ROWS_PER_SEGMENT,
-        MultiStageQueryContext.getRowsPerSegment(QueryContext.empty())
-    );
+    Assert.assertEquals(1000, MultiStageQueryContext.getRowsPerSegment(QueryContext.empty(), 1000));
   }
 
   @Test
   public void getRowsPerSegment_parameterSetReturnsCorrectValue()
   {
     Map<String, Object> propertyMap = ImmutableMap.of(CTX_ROWS_PER_SEGMENT, 10);
-    Assert.assertEquals(10, MultiStageQueryContext.getRowsPerSegment(QueryContext.of(propertyMap)));
+    Assert.assertEquals(10, MultiStageQueryContext.getRowsPerSegment(QueryContext.of(propertyMap), 1000));
   }
 
   @Test
   public void getRowsInMemory_noParameterSetReturnsDefaultValue()
   {
-    Assert.assertEquals(
-        MultiStageQueryContext.DEFAULT_ROWS_IN_MEMORY,
-        MultiStageQueryContext.getRowsInMemory(QueryContext.empty())
-    );
+    Assert.assertEquals(1000, MultiStageQueryContext.getRowsInMemory(QueryContext.empty(), 1000));
   }
 
   @Test
   public void getRowsInMemory_parameterSetReturnsCorrectValue()
   {
     Map<String, Object> propertyMap = ImmutableMap.of(CTX_ROWS_IN_MEMORY, 10);
-    Assert.assertEquals(10, MultiStageQueryContext.getRowsInMemory(QueryContext.of(propertyMap)));
+    Assert.assertEquals(10, MultiStageQueryContext.getRowsInMemory(QueryContext.of(propertyMap), 1000));
   }
 
   @Test
@@ -205,20 +198,16 @@ public class MultiStageQueryContextTest
   {
     Assert.assertNull(decodeIndexSpec(null));
 
-    Assert.assertEquals(IndexSpec.DEFAULT, decodeIndexSpec("{}"));
-    Assert.assertEquals(IndexSpec.DEFAULT, decodeIndexSpec(Collections.emptyMap()));
+    Assert.assertEquals(new IndexSpec(), decodeIndexSpec("{}"));
+    Assert.assertEquals(new IndexSpec(), decodeIndexSpec(Collections.emptyMap()));
 
     Assert.assertEquals(
-        IndexSpec.builder()
-                 .withStringDictionaryEncoding(new StringEncodingStrategy.FrontCoded(null, null))
-                 .build(),
+        new IndexSpec(null, null, new StringEncodingStrategy.FrontCoded(null, null), null, null, null, null),
         decodeIndexSpec("{\"stringDictionaryEncoding\":{\"type\":\"frontCoded\"}}")
     );
 
     Assert.assertEquals(
-        IndexSpec.builder()
-                 .withStringDictionaryEncoding(new StringEncodingStrategy.FrontCoded(null))
-                 .build(),
+        new IndexSpec(null, null, new StringEncodingStrategy.FrontCoded(null), null, null, null, null),
         decodeIndexSpec(ImmutableMap.of("stringDictionaryEncoding", ImmutableMap.of("type", "frontCoded")))
     );
 
@@ -261,13 +250,6 @@ public class MultiStageQueryContextTest
   {
     Map<String, Object> propertyMap = ImmutableMap.of(CTX_MSQ_MODE, "nonStrict");
     Assert.assertEquals("nonStrict", MultiStageQueryContext.getMSQMode(QueryContext.of(propertyMap)));
-  }
-
-  @Test
-  public void testUseAutoSchemas()
-  {
-    Map<String, Object> propertyMap = ImmutableMap.of(CTX_USE_AUTO_SCHEMAS, true);
-    Assert.assertTrue(MultiStageQueryContext.useAutoColumnSchemas(QueryContext.of(propertyMap)));
   }
 
   private static List<String> decodeSortOrder(@Nullable final String input)

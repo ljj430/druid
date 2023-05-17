@@ -68,12 +68,12 @@ public class IndexTaskSerdeTest
         null,
         null,
         new DynamicPartitionsSpec(1000, 2000L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.LZ4)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.LZ4,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
         null,
         null,
         false,
@@ -105,12 +105,12 @@ public class IndexTaskSerdeTest
         null,
         null,
         new HashedPartitionsSpec(null, 10, ImmutableList.of("dim1", "dim2")),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.LZ4)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.LZ4,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
         null,
         null,
         true,
@@ -142,12 +142,12 @@ public class IndexTaskSerdeTest
         null,
         null,
         null,
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.LZ4)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.LZ4,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
         null,
         null,
         false,
@@ -179,12 +179,12 @@ public class IndexTaskSerdeTest
         10,
         ImmutableList.of("dim1", "dim2"),
         null,
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.LZ4)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.LZ4,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
         null,
         null,
         false,
@@ -218,12 +218,12 @@ public class IndexTaskSerdeTest
         null,
         null,
         new DynamicPartitionsSpec(1000, 2000L),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.LZ4)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.LZ4,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
         null,
         null,
         true,
@@ -256,12 +256,12 @@ public class IndexTaskSerdeTest
         null,
         null,
         new HashedPartitionsSpec(null, 10, ImmutableList.of("dim1", "dim2")),
-        IndexSpec.builder()
-                 .withBitmapSerdeFactory(RoaringBitmapSerdeFactory.getInstance())
-                 .withDimensionCompression(CompressionStrategy.LZ4)
-                 .withMetricCompression(CompressionStrategy.LZF)
-                 .withLongEncoding(LongEncodingStrategy.LONGS)
-                 .build(),
+        new IndexSpec(
+            RoaringBitmapSerdeFactory.getInstance(),
+            CompressionStrategy.LZ4,
+            CompressionStrategy.LZF,
+            LongEncodingStrategy.LONGS
+        ),
         null,
         null,
         false,

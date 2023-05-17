@@ -116,12 +116,8 @@ public class VectorProcessors
     final double[] doubles = new double[maxVectorSize];
     final boolean[] nulls;
     if (constant == null) {
-      if (NullHandling.sqlCompatible()) {
-        nulls = new boolean[maxVectorSize];
-        Arrays.fill(nulls, true);
-      } else {
-        nulls = null;
-      }
+      nulls = new boolean[maxVectorSize];
+      Arrays.fill(nulls, NullHandling.sqlCompatible());
     } else {
       nulls = null;
       Arrays.fill(doubles, constant);
@@ -153,12 +149,8 @@ public class VectorProcessors
     final long[] longs = new long[maxVectorSize];
     final boolean[] nulls;
     if (constant == null) {
-      if (NullHandling.sqlCompatible()) {
-        nulls = new boolean[maxVectorSize];
-        Arrays.fill(nulls, true);
-      } else {
-        nulls = null;
-      }
+      nulls = new boolean[maxVectorSize];
+      Arrays.fill(nulls, NullHandling.sqlCompatible());
     } else {
       nulls = null;
       Arrays.fill(longs, constant);
@@ -729,7 +721,7 @@ public class VectorProcessors
               if (leftNull) {
                 if (rightNull) {
                   output[i] = 0L;
-                  outputNulls[i] = true;
+                  outputNulls[i] = NullHandling.sqlCompatible();
                   return;
                 }
                 final boolean bool = Evals.asBoolean(rightInput[i]);
@@ -778,7 +770,7 @@ public class VectorProcessors
               if (leftNull) {
                 if (rightNull) {
                   output[i] = 0;
-                  outputNulls[i] = true;
+                  outputNulls[i] = NullHandling.sqlCompatible();
                   return;
                 }
                 final boolean bool = Evals.asBoolean(rightInput[i]);
@@ -892,7 +884,7 @@ public class VectorProcessors
               if (leftNull) {
                 if (rightNull) {
                   output[i] = 0L;
-                  outputNulls[i] = true;
+                  outputNulls[i] = NullHandling.sqlCompatible();
                   return;
                 }
                 final boolean bool = Evals.asBoolean(rightInput[i]);
@@ -941,7 +933,7 @@ public class VectorProcessors
               if (leftNull) {
                 if (rightNull) {
                   output[i] = 0L;
-                  outputNulls[i] = true;
+                  outputNulls[i] = NullHandling.sqlCompatible();
                   return;
                 }
                 final boolean bool = Evals.asBoolean(rightInput[i]);
@@ -988,7 +980,7 @@ public class VectorProcessors
             final boolean rightNull = rightInput[i] == null;
             if (leftNull) {
               if (rightNull) {
-                outputNulls[i] = true;
+                outputNulls[i] = NullHandling.sqlCompatible();
                 return;
               }
               final boolean bool = Evals.asBoolean((String) rightInput[i]);

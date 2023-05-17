@@ -119,15 +119,15 @@ public class PartialDimensionCardinalityTaskTest
     }
 
     @Test
-    public void hasCorrectInputSourceResources()
+    public void hasCorrectInputSourceTypes()
     {
       PartialDimensionCardinalityTask task = new PartialDimensionCardinalityTaskBuilder()
           .build();
       Assert.assertEquals(
           Collections.singleton(
               new ResourceAction(new Resource(
-                  InlineInputSource.TYPE_KEY,
-                  ResourceType.EXTERNAL
+                  ResourceType.EXTERNAL,
+                  InlineInputSource.TYPE_KEY
               ), Action.READ)),
           task.getInputSourceResources()
       );

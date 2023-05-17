@@ -34,6 +34,9 @@ public class S3OutputConfig
 {
   public static final long S3_MULTIPART_UPLOAD_MIN_PART_SIZE_BYTES = 5L * 1024 * 1024;
   public static final long S3_MULTIPART_UPLOAD_MAX_PART_SIZE_BYTES = 5L * 1024 * 1024 * 1024L;
+  private static final int S3_MULTIPART_UPLOAD_MAX_NUM_PARTS = 10_000;
+  public static final long S3_MULTIPART_UPLOAD_MIN_OBJECT_SIZE_BYTES = 5L * 1024 * 1024;
+  public static final long S3_MULTIPART_UPLOAD_MAX_OBJECT_SIZE_BYTES = 5L * 1024 * 1024 * 1024 * 1024;
 
   @JsonProperty
   private String bucket;
@@ -45,7 +48,10 @@ public class S3OutputConfig
 
   @Nullable
   @JsonProperty
-  private HumanReadableBytes chunkSize = new HumanReadableBytes("100MiB");
+  private HumanReadableBytes chunkSize;
+
+  @JsonProperty
+  private HumanReadableBytes maxResultsSize = new HumanReadableBytes("100MiB");
 
   /**
    * Max number of tries for each upload.
@@ -59,10 +65,11 @@ public class S3OutputConfig
       @JsonProperty(value = "prefix", required = true) String prefix,
       @JsonProperty(value = "tempDir", required = true) File tempDir,
       @JsonProperty("chunkSize") HumanReadableBytes chunkSize,
+      @JsonProperty("maxResultsSize") HumanReadableBytes maxResultsSize,
       @JsonProperty("maxRetry") Integer maxRetry
   )
   {
-    this(bucket, prefix, tempDir, chunkSize, maxRetry, true);
+    this(bucket, prefix, tempDir, chunkSize, maxResultsSize, maxRetry, true);
   }
 
   @VisibleForTesting
@@ -73,6 +80,8 @@ public class S3OutputConfig
       @Nullable
       HumanReadableBytes chunkSize,
       @Nullable
+      HumanReadableBytes maxResultsSize,
+      @Nullable
       Integer maxRetry,
       boolean validation
   )
@@ -82,6 +91,9 @@ public class S3OutputConfig
     this.tempDir = tempDir;
     if (chunkSize != null) {
       this.chunkSize = chunkSize;
+    }
+    if (maxResultsSize != null) {
+      this.maxResultsSize = maxResultsSize;
     }
     if (maxRetry != null) {
       this.maxRetry = maxRetry;
@@ -104,9 +116,21 @@ public class S3OutputConfig
       );
     }
 
+    // check result size which relies on the s3 multipart upload limits.
+    // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html for more details.
+    if (maxResultsSize.getBytes() < S3_MULTIPART_UPLOAD_MIN_OBJECT_SIZE_BYTES
+        || maxResultsSize.getBytes() > S3_MULTIPART_UPLOAD_MAX_OBJECT_SIZE_BYTES) {
+      throw new IAE(
+          "maxResultsSize[%d] should be >= [%d] and <= [%d] bytes",
+          maxResultsSize.getBytes(),
+          S3_MULTIPART_UPLOAD_MIN_OBJECT_SIZE_BYTES,
+          S3_MULTIPART_UPLOAD_MAX_OBJECT_SIZE_BYTES
+      );
+    }
+
     //check results size and chunk size are compatible.
     if (chunkSize != null) {
-      validateChunkSize(chunkSize.getBytes());
+      validateChunkSize(maxResultsSize.getBytes(), chunkSize.getBytes());
     }
   }
 
@@ -127,7 +151,12 @@ public class S3OutputConfig
 
   public Long getChunkSize()
   {
-    return chunkSize.getBytes();
+    return chunkSize == null ? computeMinChunkSize(getMaxResultsSize()) : chunkSize.getBytes();
+  }
+
+  public long getMaxResultsSize()
+  {
+    return maxResultsSize.getBytes();
   }
 
   public int getMaxRetry()
@@ -135,8 +164,25 @@ public class S3OutputConfig
     return maxRetry;
   }
 
-  private static void validateChunkSize(long chunkSize)
+
+  public static long computeMinChunkSize(long maxResultsSize)
   {
+    return Math.max(
+        (long) Math.ceil(maxResultsSize / (double) S3_MULTIPART_UPLOAD_MAX_NUM_PARTS),
+        S3_MULTIPART_UPLOAD_MIN_PART_SIZE_BYTES
+    );
+  }
+
+  private static void validateChunkSize(long maxResultsSize, long chunkSize)
+  {
+    if (S3OutputConfig.computeMinChunkSize(maxResultsSize) > chunkSize) {
+      throw new IAE(
+          "chunkSize[%d] is too small for maxResultsSize[%d]. chunkSize should be at least [%d]",
+          chunkSize,
+          maxResultsSize,
+          S3OutputConfig.computeMinChunkSize(maxResultsSize)
+      );
+    }
     if (S3_MULTIPART_UPLOAD_MAX_PART_SIZE_BYTES < chunkSize) {
       throw new IAE(
           "chunkSize[%d] should be smaller than [%d]",
@@ -160,13 +206,14 @@ public class S3OutputConfig
            && bucket.equals(that.bucket)
            && prefix.equals(that.prefix)
            && tempDir.equals(that.tempDir)
-           && Objects.equals(chunkSize, that.chunkSize);
+           && Objects.equals(chunkSize, that.chunkSize)
+           && maxResultsSize.equals(that.maxResultsSize);
   }
 
   @Override
   public int hashCode()
   {
-    return Objects.hash(bucket, prefix, tempDir, chunkSize, maxRetry);
+    return Objects.hash(bucket, prefix, tempDir, chunkSize, maxResultsSize, maxRetry);
   }
 
 }

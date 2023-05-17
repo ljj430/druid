@@ -21,8 +21,6 @@ package org.apache.druid.indexing;
 
 import nl.jqno.equalsverifier.EqualsVerifier;
 import org.apache.druid.client.indexing.ClientCompactionTaskQueryTuningConfig;
-import org.apache.druid.segment.IndexSpec;
-import org.apache.druid.segment.data.CompressionStrategy;
 import org.junit.Test;
 
 public class ClientCompactQueryTuningConfigTest
@@ -31,12 +29,6 @@ public class ClientCompactQueryTuningConfigTest
   public void testEqualsContract()
   {
     // If this test failed, make sure to validate that toString was also updated correctly!
-    EqualsVerifier.forClass(ClientCompactionTaskQueryTuningConfig.class)
-                  .withPrefabValues(
-                      IndexSpec.class,
-                      IndexSpec.DEFAULT,
-                      IndexSpec.builder().withDimensionCompression(CompressionStrategy.ZSTD).build()
-                  ).usingGetClass()
-                  .verify();
+    EqualsVerifier.forClass(ClientCompactionTaskQueryTuningConfig.class).usingGetClass().verify();
   }
 }

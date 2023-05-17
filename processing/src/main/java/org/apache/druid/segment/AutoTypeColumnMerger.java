@@ -40,7 +40,7 @@ import org.apache.druid.segment.nested.ScalarDoubleColumnSerializer;
 import org.apache.druid.segment.nested.ScalarLongColumnSerializer;
 import org.apache.druid.segment.nested.ScalarStringColumnSerializer;
 import org.apache.druid.segment.nested.SortedValueDictionary;
-import org.apache.druid.segment.nested.VariantColumnSerializer;
+import org.apache.druid.segment.nested.VariantArrayColumnSerializer;
 import org.apache.druid.segment.serde.NestedCommonFormatColumnPartSerde;
 import org.apache.druid.segment.writeout.SegmentWriteOutMedium;
 
@@ -81,8 +81,6 @@ public class AutoTypeColumnMerger implements DimensionMergerV9
   private NestedCommonFormatColumnSerializer serializer;
 
   private ColumnType logicalType;
-  private boolean isVariantType = false;
-  private boolean hasOnlyNulls = false;
 
   public AutoTypeColumnMerger(
       String name,
@@ -118,9 +116,6 @@ public class AutoTypeColumnMerger implements DimensionMergerV9
         final IndexableAdapter.NestedColumnMergable mergable = closer.register(
             adapter.getNestedColumnMergeables(name)
         );
-        if (mergable == null) {
-          continue;
-        }
         final SortedValueDictionary dimValues = mergable.getValueDictionary();
 
         boolean allNulls = dimValues == null || dimValues.allNull();
@@ -135,50 +130,45 @@ public class AutoTypeColumnMerger implements DimensionMergerV9
         }
       }
 
-      // no data, we don't need to write this column
-      if (mergedFields.size() == 0) {
-        hasOnlyNulls = true;
-        return;
-      }
-
       // check to see if we can specialize the serializer after merging all the adapters
-      final FieldTypeInfo.MutableTypeSet rootTypes = mergedFields.get(NestedPathFinder.JSON_PATH_ROOT);
-      final boolean rootOnly = mergedFields.size() == 1 && rootTypes != null;
-      if (rootOnly && rootTypes.getSingleType() != null) {
-        logicalType = rootTypes.getSingleType();
+      if (isSingleTypeRoot(mergedFields)) {
+        logicalType = mergedFields.get(NestedPathFinder.JSON_PATH_ROOT).getSingleType();
         switch (logicalType.getType()) {
           case LONG:
-            serializer = new ScalarLongColumnSerializer(
+            final ScalarLongColumnSerializer longSerializer = new ScalarLongColumnSerializer(
                 name,
                 indexSpec,
                 segmentWriteOutMedium,
                 closer
             );
+            serializer = longSerializer;
             break;
           case DOUBLE:
-            serializer = new ScalarDoubleColumnSerializer(
+            final ScalarDoubleColumnSerializer doubleSerializer = new ScalarDoubleColumnSerializer(
                 name,
                 indexSpec,
                 segmentWriteOutMedium,
                 closer
             );
+            serializer = doubleSerializer;
             break;
           case STRING:
-            serializer = new ScalarStringColumnSerializer(
+            final ScalarStringColumnSerializer stringSerializer = new ScalarStringColumnSerializer(
                 name,
                 indexSpec,
                 segmentWriteOutMedium,
                 closer
             );
+            serializer = stringSerializer;
             break;
           case ARRAY:
-            serializer = new VariantColumnSerializer(
+            final VariantArrayColumnSerializer arraySerializer = new VariantArrayColumnSerializer(
                 name,
-                null,
                 indexSpec,
                 segmentWriteOutMedium,
                 closer
             );
+            serializer = arraySerializer;
             break;
           default:
             throw new ISE(
@@ -187,20 +177,6 @@ public class AutoTypeColumnMerger implements DimensionMergerV9
                 logicalType
             );
         }
-      } else if (rootOnly) {
-        // mixed type column, but only root path, we can use VariantArrayColumnSerializer
-        // pick the least restrictive type for the logical type
-        isVariantType = true;
-        for (ColumnType type : FieldTypeInfo.convertToSet(rootTypes.getByteValue())) {
-          logicalType = ColumnType.leastRestrictiveType(logicalType, type);
-        }
-        serializer = new VariantColumnSerializer(
-            name,
-            rootTypes.getByteValue(),
-            indexSpec,
-            segmentWriteOutMedium,
-            closer
-        );
       } else {
         // all the bells and whistles
         logicalType = ColumnType.NESTED_DATA;
@@ -283,6 +259,13 @@ public class AutoTypeColumnMerger implements DimensionMergerV9
     }
   }
 
+  private static boolean isSingleTypeRoot(SortedMap<String, FieldTypeInfo.MutableTypeSet> mergedFields)
+  {
+    return mergedFields.size() == 1
+           && mergedFields.get(NestedPathFinder.JSON_PATH_ROOT) != null
+           && mergedFields.get(NestedPathFinder.JSON_PATH_ROOT).getSingleType() != null;
+  }
+
   @Override
   public ColumnValueSelector convertSortedSegmentRowValuesToMergedRowValues(
       int segmentIndex,
@@ -307,7 +290,7 @@ public class AutoTypeColumnMerger implements DimensionMergerV9
   @Override
   public boolean hasOnlyNulls()
   {
-    return hasOnlyNulls;
+    return false;
   }
 
   @Override
@@ -318,7 +301,6 @@ public class AutoTypeColumnMerger implements DimensionMergerV9
     final NestedCommonFormatColumnPartSerde partSerde = NestedCommonFormatColumnPartSerde.serializerBuilder()
                                                                                          .withLogicalType(logicalType)
                                                                                          .withHasNulls(serializer.hasNulls())
-                                                                                         .isVariantType(isVariantType)
                                                                                          .withByteOrder(ByteOrder.nativeOrder())
                                                                                          .withBitmapSerdeFactory(indexSpec.getBitmapSerdeFactory())
                                                                                          .withSerializer(serializer)

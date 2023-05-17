@@ -27,7 +27,6 @@ import org.apache.druid.java.util.common.StringUtils;
 import org.apache.druid.java.util.common.lifecycle.LifecycleStart;
 import org.apache.druid.java.util.common.lifecycle.LifecycleStop;
 import org.apache.druid.java.util.common.logger.Logger;
-import org.slf4j.MarkerFactory;
 
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -99,24 +98,24 @@ public class LoggingEmitter implements Emitter
       switch (level) {
         case TRACE:
           if (log.isTraceEnabled()) {
-            log.trace(MarkerFactory.getMarker(event.getFeed()), jsonMapper.writeValueAsString(event));
+            log.trace(jsonMapper.writeValueAsString(event));
           }
           break;
         case DEBUG:
           if (log.isDebugEnabled()) {
-            log.debug(MarkerFactory.getMarker(event.getFeed()), jsonMapper.writeValueAsString(event));
+            log.debug(jsonMapper.writeValueAsString(event));
           }
           break;
         case INFO:
           if (log.isInfoEnabled()) {
-            log.info(MarkerFactory.getMarker(event.getFeed()), jsonMapper.writeValueAsString(event));
+            log.info(jsonMapper.writeValueAsString(event));
           }
           break;
         case WARN:
-          log.warn(MarkerFactory.getMarker(event.getFeed()), jsonMapper.writeValueAsString(event));
+          log.warn(jsonMapper.writeValueAsString(event));
           break;
         case ERROR:
-          log.error(MarkerFactory.getMarker(event.getFeed()), jsonMapper.writeValueAsString(event));
+          log.error(jsonMapper.writeValueAsString(event));
           break;
       }
     }

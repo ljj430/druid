@@ -64,7 +64,6 @@ import org.apache.druid.query.filter.DimFilter;
 import org.apache.druid.query.filter.Filter;
 import org.apache.druid.query.filter.ValueMatcher;
 import org.apache.druid.query.filter.vector.VectorValueMatcher;
-import org.apache.druid.segment.AutoTypeColumnSchema;
 import org.apache.druid.segment.ColumnInspector;
 import org.apache.druid.segment.ColumnSelector;
 import org.apache.druid.segment.ColumnSelectorFactory;
@@ -120,7 +119,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public abstract class BaseFilterTest extends InitializedNullHandlingTest
 {
@@ -312,105 +310,44 @@ public abstract class BaseFilterTest extends InitializedNullHandlingTest
 
     final Map<String, Function<IndexBuilder, Pair<StorageAdapter, Closeable>>> finishers =
         ImmutableMap.<String, Function<IndexBuilder, Pair<StorageAdapter, Closeable>>>builder()
-                    .put(
-                        "incremental",
-                        input -> {
-                          final IncrementalIndex index = input.buildIncrementalIndex();
-                          return Pair.of(new IncrementalIndexStorageAdapter(index), index);
-                        }
-                    )
-                    .put(
-                        "mmappedAutoTypes",
-                        input -> {
-                          input.mapSchema(
-                              schema ->
-                                  new IncrementalIndexSchema(
-                                      schema.getMinTimestamp(),
-                                      schema.getTimestampSpec(),
-                                      schema.getGran(),
-                                      schema.getVirtualColumns(),
-                                      schema.getDimensionsSpec().withDimensions(
-                                          schema.getDimensionsSpec()
-                                                .getDimensions()
-                                                .stream()
-                                                .map(
-                                                    dimensionSchema -> new AutoTypeColumnSchema(dimensionSchema.getName())
-                                                )
-                                                .collect(Collectors.toList())
-                                      ),
-                                      schema.getMetrics(),
-                                      schema.isRollup()
-                                  )
-                          );
-                          final QueryableIndex index = input.buildMMappedIndex();
-                          return Pair.of(new QueryableIndexStorageAdapter(index), index);
-                        }
-                    )
-                    .put(
-                        "mmappedAutoTypesMerged",
-                        input -> {
-                          input.mapSchema(
-                              schema ->
-                                  new IncrementalIndexSchema(
-                                      schema.getMinTimestamp(),
-                                      schema.getTimestampSpec(),
-                                      schema.getGran(),
-                                      schema.getVirtualColumns(),
-                                      schema.getDimensionsSpec().withDimensions(
-                                          schema.getDimensionsSpec()
-                                                .getDimensions()
-                                                .stream()
-                                                .map(
-                                                    dimensionSchema -> new AutoTypeColumnSchema(dimensionSchema.getName())
-                                                )
-                                                .collect(Collectors.toList())
-                                      ),
-                                      schema.getMetrics(),
-                                      schema.isRollup()
-                                  )
-                          );
-                          // if 1 row per segment some of the columns have null values for the row which causes 'auto'
-                          // typing default value coercion to be lost in default value mode, so make sure there is at
-                          // least one number in each segment for these tests to pass correctly because the column
-                          // is typeless and so doesn't write out zeros like regular numbers do
-                          input.intermediaryPersistSize(3);
-                          final QueryableIndex index = input.buildMMappedMergedIndex();
-                          return Pair.of(new QueryableIndexStorageAdapter(index), index);
-                        }
-                    )
-                    .put(
-                        "mmapped",
-                        input -> {
-                          final QueryableIndex index = input.buildMMappedIndex();
-                          return Pair.of(new QueryableIndexStorageAdapter(index), index);
-                        }
-                    )
-                    .put(
-                        "mmappedMerged",
-                        input -> {
-                          final QueryableIndex index = input.buildMMappedMergedIndex();
-                          return Pair.of(new QueryableIndexStorageAdapter(index), index);
-                        }
-                    )
-                    .put(
-                        "rowBasedWithoutTypeSignature",
-                        input -> Pair.of(input.buildRowBasedSegmentWithoutTypeSignature().asStorageAdapter(), () -> {
-                        })
-                    )
-                    .put(
-                        "rowBasedWithTypeSignature",
-                        input -> Pair.of(input.buildRowBasedSegmentWithTypeSignature().asStorageAdapter(), () -> {
-                        })
-                    )
-                    .put("frame (row-based)", input -> {
-                      final FrameSegment segment = input.buildFrameSegment(FrameType.ROW_BASED);
-                      return Pair.of(segment.asStorageAdapter(), segment);
-                    })
-                    .put("frame (columnar)", input -> {
-                      final FrameSegment segment = input.buildFrameSegment(FrameType.COLUMNAR);
-                      return Pair.of(segment.asStorageAdapter(), segment);
-                    })
-                    .build();
+            .put(
+                "incremental",
+                input -> {
+                  final IncrementalIndex index = input.buildIncrementalIndex();
+                  return Pair.of(new IncrementalIndexStorageAdapter(index), index);
+                }
+            )
+            .put(
+                "mmapped",
+                input -> {
+                  final QueryableIndex index = input.buildMMappedIndex();
+                  return Pair.of(new QueryableIndexStorageAdapter(index), index);
+                }
+            )
+            .put(
+                "mmappedMerged",
+                input -> {
+                  final QueryableIndex index = input.buildMMappedMergedIndex();
+                  return Pair.of(new QueryableIndexStorageAdapter(index), index);
+                }
+            )
+            .put(
+                "rowBasedWithoutTypeSignature",
+                input -> Pair.of(input.buildRowBasedSegmentWithoutTypeSignature().asStorageAdapter(), () -> {})
+            )
+            .put(
+                "rowBasedWithTypeSignature",
+                input -> Pair.of(input.buildRowBasedSegmentWithTypeSignature().asStorageAdapter(), () -> {})
+            )
+            .put("frame (row-based)", input -> {
+              final FrameSegment segment = input.buildFrameSegment(FrameType.ROW_BASED);
+              return Pair.of(segment.asStorageAdapter(), segment);
+            })
+            .put("frame (columnar)", input -> {
+              final FrameSegment segment = input.buildFrameSegment(FrameType.COLUMNAR);
+              return Pair.of(segment.asStorageAdapter(), segment);
+            })
+            .build();
 
     StringEncodingStrategy[] stringEncoding = new StringEncodingStrategy[]{
         new StringEncodingStrategy.Utf8(),
@@ -438,10 +375,15 @@ public abstract class BaseFilterTest extends InitializedNullHandlingTest
                     .create()
                     .schema(DEFAULT_INDEX_SCHEMA)
                     .indexSpec(
-                        IndexSpec.builder()
-                                 .withBitmapSerdeFactory(bitmapSerdeFactoryEntry.getValue())
-                                 .withStringDictionaryEncoding(encodingStrategy)
-                                 .build()
+                        new IndexSpec(
+                            bitmapSerdeFactoryEntry.getValue(),
+                            null,
+                            encodingStrategy,
+                            null,
+                            null,
+                            null,
+                            null
+                        )
                     )
                     .segmentWriteOutMediumFactory(segmentWriteOutMediumFactoryEntry.getValue());
                 constructors.add(new Object[]{testName, indexBuilder, finisherEntry.getValue(), cnf, optimize});
@@ -879,66 +821,58 @@ public abstract class BaseFilterTest extends InitializedNullHandlingTest
       final boolean testVectorized
   )
   {
-    try {
+    Assert.assertEquals(
+        "Cursor: " + filter,
+        expectedRows,
+        selectColumnValuesMatchingFilter(filter, "dim0")
+    );
+
+    if (testVectorized) {
       Assert.assertEquals(
-          "Cursor: " + filter,
+          "Cursor (vectorized): " + filter,
           expectedRows,
-          selectColumnValuesMatchingFilter(filter, "dim0")
+          selectColumnValuesMatchingFilterUsingVectorCursor(filter, "dim0")
       );
 
-      if (testVectorized) {
-        Assert.assertEquals(
-            "Cursor (vectorized): " + filter,
-            expectedRows,
-            selectColumnValuesMatchingFilterUsingVectorCursor(filter, "dim0")
-        );
-
-        Assert.assertEquals(
-            "Cursor Virtual Column (vectorized): " + filter,
-            expectedRows,
-            selectColumnValuesMatchingFilterUsingVectorVirtualColumnCursor(filter, "vdim0", "dim0")
-        );
-      }
-
       Assert.assertEquals(
-          "Cursor with postFiltering: " + filter,
+          "Cursor Virtual Column (vectorized): " + filter,
           expectedRows,
-          selectColumnValuesMatchingFilterUsingPostFiltering(filter, "dim0")
+          selectColumnValuesMatchingFilterUsingVectorVirtualColumnCursor(filter, "vdim0", "dim0")
       );
+    }
 
-      if (testVectorized) {
-        Assert.assertEquals(
-            "Cursor with postFiltering (vectorized): " + filter,
-            expectedRows,
-            selectColumnValuesMatchingFilterUsingVectorizedPostFiltering(filter, "dim0")
-        );
-      }
+    Assert.assertEquals(
+        "Cursor with postFiltering: " + filter,
+        expectedRows,
+        selectColumnValuesMatchingFilterUsingPostFiltering(filter, "dim0")
+    );
 
+    if (testVectorized) {
       Assert.assertEquals(
-          "Filtered aggregator: " + filter,
+          "Cursor with postFiltering (vectorized): " + filter,
+          expectedRows,
+          selectColumnValuesMatchingFilterUsingVectorizedPostFiltering(filter, "dim0")
+      );
+    }
+
+    Assert.assertEquals(
+        "Filtered aggregator: " + filter,
+        expectedRows.size(),
+        selectCountUsingFilteredAggregator(filter)
+    );
+
+    if (testVectorized) {
+      Assert.assertEquals(
+          "Filtered aggregator (vectorized): " + filter,
           expectedRows.size(),
-          selectCountUsingFilteredAggregator(filter)
-      );
-
-      if (testVectorized) {
-        Assert.assertEquals(
-            "Filtered aggregator (vectorized): " + filter,
-            expectedRows.size(),
-            selectCountUsingVectorizedFilteredAggregator(filter)
-        );
-      }
-
-      Assert.assertEquals(
-          "RowBasedColumnSelectorFactory: " + filter,
-          expectedRows,
-          selectColumnValuesMatchingFilterUsingRowBasedColumnSelectorFactory(filter, "dim0")
+          selectCountUsingVectorizedFilteredAggregator(filter)
       );
     }
-    catch (ISE ise) {
-      // ignore failures resulting from 'auto'
-      if (!(testName.contains("AutoTypes") && "Unsupported type[ARRAY<STRING>]".equals(ise.getMessage()))) {
-        throw ise;
-      }
-    }
+
+    Assert.assertEquals(
+        "RowBasedColumnSelectorFactory: " + filter,
+        expectedRows,
+        selectColumnValuesMatchingFilterUsingRowBasedColumnSelectorFactory(filter, "dim0")
+    );
   }
 }

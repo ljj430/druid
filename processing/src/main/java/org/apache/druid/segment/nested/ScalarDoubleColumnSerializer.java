@@ -45,9 +45,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.WritableByteChannel;
 
-/**
- * Serializer for a {@link ScalarDoubleColumn}
- */
 public class ScalarDoubleColumnSerializer extends NestedCommonFormatColumnSerializer
 {
   private static final Logger log = new Logger(ScalarDoubleColumnSerializer.class);
@@ -173,8 +170,8 @@ public class ScalarDoubleColumnSerializer extends NestedCommonFormatColumnSerial
 
     // null is always 0
     doubleDictionaryWriter.write(null);
+    // put a dummy string in there
     dictionaryIdLookup.addNumericNull();
-
     for (Double value : doubles) {
       if (value == null) {
         continue;

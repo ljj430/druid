@@ -309,10 +309,28 @@ public class TimewarpOperatorTest
   public void testEmptyFutureInterval()
   {
     QueryRunner<Result<TimeseriesResultValue>> queryRunner = testOperator.postProcess(
-        (queryPlus, responseContext) -> {
-          final Query<Result<TimeseriesResultValue>> query = queryPlus.getQuery();
-          Assert.assertTrue(query.getIntervals().isEmpty());
-          return Sequences.empty();
+        new QueryRunner<Result<TimeseriesResultValue>>()
+        {
+          @Override
+          public Sequence<Result<TimeseriesResultValue>> run(
+              QueryPlus<Result<TimeseriesResultValue>> queryPlus,
+              ResponseContext responseContext
+          )
+          {
+            final Query<Result<TimeseriesResultValue>> query = queryPlus.getQuery();
+            return Sequences.simple(
+                ImmutableList.of(
+                    new Result<>(
+                        query.getIntervals().get(0).getStart(),
+                        new TimeseriesResultValue(ImmutableMap.of("metric", 2))
+                    ),
+                    new Result<>(
+                        query.getIntervals().get(0).getEnd(),
+                        new TimeseriesResultValue(ImmutableMap.of("metric", 3))
+                    )
+                )
+            );
+          }
         },
         DateTimes.of("2014-08-02").getMillis()
     );
@@ -320,12 +338,21 @@ public class TimewarpOperatorTest
     final Query<Result<TimeseriesResultValue>> query =
         Druids.newTimeseriesQueryBuilder()
               .dataSource("dummy")
-              .intervals("2014-08-06/2014-08-08") // Warped interval is zero-length
+              .intervals("2014-08-06/2014-08-08")
               .aggregators(Collections.singletonList(new CountAggregatorFactory("count")))
               .build();
 
     Assert.assertEquals(
-        Collections.emptyList(),
+        Lists.newArrayList(
+            new Result<>(
+                DateTimes.of("2014-08-02"),
+                new TimeseriesResultValue(ImmutableMap.of("metric", 2))
+            ),
+            new Result<>(
+                DateTimes.of("2014-08-02"),
+                new TimeseriesResultValue(ImmutableMap.of("metric", 3))
+            )
+        ),
         queryRunner.run(QueryPlus.wrap(query)).toList()
     );
   }

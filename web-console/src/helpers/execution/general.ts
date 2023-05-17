@@ -23,7 +23,7 @@ import type { Execution } from '../../druid-models';
 import { IntermediateQueryState } from '../../utils';
 
 import {
-  updateExecutionWithDatasourceLoadedIfNeeded,
+  updateExecutionWithDatasourceExistsIfNeeded,
   updateExecutionWithTaskIfNeeded,
 } from './sql-task-execution';
 
@@ -49,7 +49,7 @@ export async function executionBackgroundStatusCheck(
   switch (execution.engine) {
     case 'sql-msq-task':
       execution = await updateExecutionWithTaskIfNeeded(execution, cancelToken);
-      execution = await updateExecutionWithDatasourceLoadedIfNeeded(execution, cancelToken);
+      execution = await updateExecutionWithDatasourceExistsIfNeeded(execution, cancelToken);
       break;
 
     default:

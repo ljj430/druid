@@ -92,36 +92,21 @@ public class QueryHostFinder
   public Server findServerSql(SqlQuery sqlQuery)
   {
     Server server = findServerInner(hostSelector.selectForSql(sqlQuery));
-    assertServerFound(
-        server,
-        "There are no available brokers for SQL query[%s]."
-        + "Please check that your brokers are "
-        + "running and healthy.",
-        sqlQuery
-    );
+    assertServerFound(server, "No server found for SQL Query [%s]", "SELECT IT");
     return server;
   }
 
   public <T> Server pickServer(Query<T> query)
   {
     Server server = findServer(query);
-    assertServerFound(
-        server,
-        "There are no available brokers for query[%s]."
-        + "Please check that your brokers are "
-        + "running and healthy.",
-        query
-    );
+    assertServerFound(server, "No server found for query[%s]", query);
     return server;
   }
 
   public Server pickDefaultServer()
   {
     Server server = findDefaultServer();
-    assertServerFound(
-        server,
-        "There are no available brokers. Please check that your brokers are running and " + " healthy."
-    );
+    assertServerFound(server, "No default server found!");
     return server;
   }
 
@@ -167,7 +152,7 @@ public class QueryHostFinder
     }
 
     log.makeAlert(
-        "Catastrophic failure! No brokers found at all! Failing request!"
+        "Catastrophic failure! No servers found at all! Failing request!"
     ).emit();
 
     throw new ISE(messageFormat, args);

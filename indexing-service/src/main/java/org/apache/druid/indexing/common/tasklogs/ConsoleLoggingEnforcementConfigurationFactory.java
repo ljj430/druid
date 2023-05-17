@@ -19,7 +19,6 @@
 
 package org.apache.druid.indexing.common.tasklogs;
 
-import org.apache.druid.java.util.common.logger.Logger;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.Appender;
 import org.apache.logging.log4j.core.Filter;
@@ -29,7 +28,6 @@ import org.apache.logging.log4j.core.config.AppenderRef;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.ConfigurationFactory;
 import org.apache.logging.log4j.core.config.ConfigurationSource;
-import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.core.config.xml.XmlConfiguration;
 import org.apache.logging.log4j.core.layout.PatternLayout;
@@ -50,19 +48,10 @@ import java.util.stream.Collectors;
  */
 public class ConsoleLoggingEnforcementConfigurationFactory extends ConfigurationFactory
 {
-
-  private static final Logger log = new Logger(ConsoleLoggingEnforcementConfigurationFactory.class);
-
   /**
    * Valid file extensions for XML files.
    */
   public static final String[] SUFFIXES = new String[]{".xml", "*"};
-
-  // Alter log level for this class to be warning. This needs to happen because the logger is using the default
-  // config, which is always level error and appends to console, since the logger is being configured by this class.
-  static {
-    Configurator.setLevel(log.getName(), Level.WARN);
-  }
 
   @Override
   public String[] getSupportedTypes()
@@ -106,7 +95,6 @@ public class ConsoleLoggingEnforcementConfigurationFactory extends Configuration
       loggerConfigList.add(this.getRootLogger());
       loggerConfigList.addAll(this.getLoggers().values());
 
-
       //
       // For all logger configuration, check if its appender is ConsoleAppender.
       // If not, replace it's appender to ConsoleAppender.
@@ -129,16 +117,16 @@ public class ConsoleLoggingEnforcementConfigurationFactory extends Configuration
     }
 
     /**
-     * Ensure there is a console logger defined. Without a console logger peon logs wont be able to be stored in deep storage
+     * remove all appenders from a logger and append a console appender to it
      */
     private void applyConsoleAppender(LoggerConfig logger, Appender consoleAppender)
     {
-      for (AppenderRef appenderRef : logger.getAppenderRefs()) {
-        if (consoleAppender.getName().equals(appenderRef.getRef())) {
-          // we need a console logger no matter what, but we want to be able to define a different appender if necessary
-          return;
-        }
+      if (logger.getAppenderRefs().size() == 1
+          && logger.getAppenderRefs().get(0).getRef().equals(consoleAppender.getName())) {
+        // this logger has only one appender and its the console appender
+        return;
       }
+
       Level level = Level.INFO;
       Filter filter = null;
 
@@ -155,11 +143,7 @@ public class ConsoleLoggingEnforcementConfigurationFactory extends Configuration
         // use the first appender's definition
         level = appenderRef.getLevel();
         filter = appenderRef.getFilter();
-        log.warn("Clearing all configured appenders for logger %s. Using %s instead.",
-                 logger.toString(),
-                 consoleAppender.getName());
       }
-
 
       // add ConsoleAppender to this logger
       logger.addAppender(consoleAppender, level, filter);

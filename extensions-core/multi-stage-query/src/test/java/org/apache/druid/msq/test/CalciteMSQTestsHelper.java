@@ -25,8 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.TypeLiteral;
-import org.apache.druid.collections.ReferenceCountingResourceHolder;
-import org.apache.druid.collections.ResourceHolder;
 import org.apache.druid.data.input.impl.DimensionsSpec;
 import org.apache.druid.data.input.impl.LongDimensionSchema;
 import org.apache.druid.data.input.impl.StringDimensionSchema;
@@ -37,12 +35,14 @@ import org.apache.druid.guice.JoinableFactoryModule;
 import org.apache.druid.guice.annotations.Self;
 import org.apache.druid.indexing.common.SegmentCacheManagerFactory;
 import org.apache.druid.java.util.common.ISE;
+import org.apache.druid.java.util.common.Pair;
 import org.apache.druid.java.util.common.concurrent.Execs;
 import org.apache.druid.java.util.common.io.Closer;
 import org.apache.druid.math.expr.ExprMacroTable;
 import org.apache.druid.msq.guice.MSQExternalDataSourceModule;
 import org.apache.druid.msq.guice.MSQIndexingModule;
 import org.apache.druid.msq.querykit.DataSegmentProvider;
+import org.apache.druid.msq.querykit.LazyResourceHolder;
 import org.apache.druid.query.DruidProcessingConfig;
 import org.apache.druid.query.ForwardingQueryProcessingPool;
 import org.apache.druid.query.QueryProcessingPool;
@@ -55,6 +55,7 @@ import org.apache.druid.query.groupby.GroupByQueryConfig;
 import org.apache.druid.query.groupby.GroupByQueryRunnerTest;
 import org.apache.druid.query.groupby.TestGroupByBuffers;
 import org.apache.druid.query.groupby.strategy.GroupByStrategySelector;
+import org.apache.druid.query.lookup.LookupReferencesManager;
 import org.apache.druid.segment.IndexBuilder;
 import org.apache.druid.segment.IndexIO;
 import org.apache.druid.segment.QueryableIndex;
@@ -79,8 +80,10 @@ import org.joda.time.Interval;
 import org.junit.rules.TemporaryFolder;
 
 import javax.annotation.Nullable;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -106,6 +109,11 @@ public class CalciteMSQTestsHelper
 
     Module customBindings =
         binder -> {
+          final LookupReferencesManager lookupReferencesManager =
+              EasyMock.createStrictMock(LookupReferencesManager.class);
+          EasyMock.expect(lookupReferencesManager.getAllLookupNames()).andReturn(Collections.emptySet()).anyTimes();
+          EasyMock.replay(lookupReferencesManager);
+          binder.bind(LookupReferencesManager.class).toInstance(lookupReferencesManager);
           binder.bind(AppenderatorsManager.class).toProvider(() -> null);
 
           // Requirements of JoinableFactoryModule
@@ -160,7 +168,8 @@ public class CalciteMSQTestsHelper
           ));
           binder.bind(DataSegmentAnnouncer.class).toInstance(new NoopDataSegmentAnnouncer());
           binder.bind(DataSegmentProvider.class)
-                .toInstance((dataSegment, channelCounters) -> getSupplierForSegment(dataSegment));
+                .toInstance((dataSegment, channelCounters) ->
+                                new LazyResourceHolder<>(getSupplierForSegment(dataSegment)));
 
           GroupByQueryConfig groupByQueryConfig = new GroupByQueryConfig();
           binder.bind(GroupByStrategySelector.class)
@@ -176,7 +185,7 @@ public class CalciteMSQTestsHelper
     );
   }
 
-  private static Supplier<ResourceHolder<Segment>> getSupplierForSegment(SegmentId segmentId)
+  private static Supplier<Pair<Segment, Closeable>> getSupplierForSegment(SegmentId segmentId)
   {
     final TemporaryFolder temporaryFolder = new TemporaryFolder();
     try {
@@ -234,7 +243,6 @@ public class CalciteMSQTestsHelper
               .buildMMappedIndex();
           break;
         case DATASOURCE3:
-        case CalciteTests.BROADCAST_DATASOURCE:
           index = IndexBuilder
               .create()
               .tmpDir(new File(temporaryFolder.newFolder(), "3"))
@@ -283,6 +291,13 @@ public class CalciteMSQTestsHelper
       {
       }
     };
-    return () -> new ReferenceCountingResourceHolder<>(segment, Closer.create());
+    return new Supplier<Pair<Segment, Closeable>>()
+    {
+      @Override
+      public Pair<Segment, Closeable> get()
+      {
+        return new Pair<>(segment, Closer.create());
+      }
+    };
   }
 }

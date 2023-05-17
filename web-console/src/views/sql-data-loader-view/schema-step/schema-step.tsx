@@ -49,12 +49,12 @@ import { AsyncActionDialog } from '../../../dialogs';
 import type { Execution, ExternalConfig, IngestQueryPattern } from '../../../druid-models';
 import {
   changeQueryPatternExpression,
-  DETECTION_TIMESTAMP_SPEC,
   fitIngestQueryPattern,
   getDestinationMode,
   getQueryPatternExpression,
   getQueryPatternExpressionType,
   ingestQueryPatternToQuery,
+  PLACEHOLDER_TIMESTAMP_SPEC,
   possibleDruidFormatForValues,
   TIME_COLUMN,
   WorkbenchQueryPart,
@@ -84,7 +84,7 @@ import {
   wait,
   without,
 } from '../../../utils';
-import { getHeaderFromSampleResponse, postToSampler } from '../../../utils/sampler';
+import { postToSampler } from '../../../utils/sampler';
 import { FlexibleQueryInput } from '../../workbench-view/flexible-query-input/flexible-query-input';
 import { ColumnActions } from '../column-actions/column-actions';
 import { ColumnEditor } from '../column-editor/column-editor';
@@ -299,30 +299,12 @@ export const SchemaStep = function SchemaStep(props: SchemaStepProps) {
     onQueryStringChange(parsedQuery.apply(queryAction).toString());
   });
 
-  const handleModeSelect = (newMode: Mode) => {
-    if (newMode === 'sql' && editorColumn) {
-      if (editorColumn.dirty) {
-        AppToaster.show({
-          message:
-            'Please save or discard the changes in the column editor before switching to the SQL tab.',
-          intent: Intent.WARNING,
-        });
-        return;
-      }
-
-      setEditorColumn(undefined);
-    }
-
-    setMode(newMode);
-  };
-
   const handleColumnSelect = usePermanentCallback((index: number) => {
     if (!ingestQueryPattern) return;
 
     if (editorColumn?.dirty) {
       AppToaster.show({
-        message:
-          'Please save or discard the changes in the column editor before switching columns.',
+        message: 'Please save or discard the changes in the column editor.',
         intent: Intent.WARNING,
       });
       return;
@@ -424,14 +406,12 @@ export const SchemaStep = function SchemaStep(props: SchemaStepProps) {
             },
             dataSchema: {
               dataSource: 'sample',
-              timestampSpec: DETECTION_TIMESTAMP_SPEC,
+              timestampSpec: PLACEHOLDER_TIMESTAMP_SPEC,
               dimensionsSpec: {
-                dimensions: filterMap(sampleExternalConfig.signature, s => {
-                  const columnName = s.getColumnName();
-                  if (columnName === TIME_COLUMN) return;
+                dimensions: sampleExternalConfig.signature.map(s => {
                   const t = s.columnType.getNativeType();
                   return {
-                    name: columnName,
+                    name: s.getColumnName(),
                     type: t === 'COMPLEX<json>' ? 'json' : t,
                   };
                 }),
@@ -449,11 +429,12 @@ export const SchemaStep = function SchemaStep(props: SchemaStepProps) {
         'sample',
       );
 
-      const columns = getHeaderFromSampleResponse(sampleResponse).map(({ name, type }) => {
+      const columns = filterMap(sampleResponse.logicalSegmentSchema, ({ name, type }) => {
+        if (name === '__time') return;
         return new Column({
           name,
           nativeType: type,
-          sqlType: name === TIME_COLUMN ? 'TIMESTAMP' : SqlType.fromNativeType(type).toString(),
+          sqlType: SqlType.fromNativeType(type).toString(),
         });
       });
 
@@ -715,20 +696,20 @@ export const SchemaStep = function SchemaStep(props: SchemaStepProps) {
                 text="Table"
                 disabled={!ingestQueryPattern}
                 active={effectiveMode === 'table'}
-                onClick={() => handleModeSelect('table')}
+                onClick={() => setMode('table')}
               />
               <Button
                 icon={IconNames.LIST_COLUMNS}
                 text="List"
                 disabled={!ingestQueryPattern}
                 active={effectiveMode === 'list'}
-                onClick={() => handleModeSelect('list')}
+                onClick={() => setMode('list')}
               />
               <Button
                 icon={IconNames.APPLICATION}
                 text="SQL"
                 active={effectiveMode === 'sql'}
-                onClick={() => handleModeSelect('sql')}
+                onClick={() => setMode('sql')}
               />
             </ButtonGroup>
             {enableAnalyze && ingestQueryPattern?.metrics && (

@@ -33,19 +33,16 @@ export const ACTION_COLUMN_WIDTH = 70;
 
 export interface ActionCellProps {
   onDetail?: () => void;
-  disableDetail?: boolean;
   actions?: BasicAction[];
 }
 
 export const ActionCell = React.memo(function ActionCell(props: ActionCellProps) {
-  const { onDetail, disableDetail, actions } = props;
+  const { onDetail, actions } = props;
   const actionsMenu = actions ? basicActionsToMenu(actions) : null;
 
   return (
     <div className="action-cell">
-      {onDetail && (
-        <ActionIcon icon={IconNames.SEARCH_TEMPLATE} onClick={onDetail} disabled={disableDetail} />
-      )}
+      {onDetail && <ActionIcon icon={IconNames.SEARCH_TEMPLATE} onClick={onDetail} />}
       {actionsMenu && (
         <Popover2 content={actionsMenu} position={Position.BOTTOM_RIGHT}>
           <ActionIcon icon={IconNames.MORE} />

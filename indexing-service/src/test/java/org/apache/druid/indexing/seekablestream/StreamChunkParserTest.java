@@ -34,14 +34,11 @@ import org.apache.druid.data.input.impl.JsonInputFormat;
 import org.apache.druid.data.input.impl.StringInputRowParser;
 import org.apache.druid.data.input.impl.TimestampSpec;
 import org.apache.druid.java.util.common.DateTimes;
-import org.apache.druid.java.util.common.IAE;
-import org.apache.druid.java.util.common.RE;
 import org.apache.druid.java.util.common.StringUtils;
 import org.apache.druid.java.util.common.parsers.JSONPathSpec;
-import org.apache.druid.java.util.common.parsers.ParseException;
+import org.apache.druid.segment.incremental.NoopRowIngestionMeters;
 import org.apache.druid.segment.incremental.ParseExceptionHandler;
 import org.apache.druid.segment.incremental.RowIngestionMeters;
-import org.apache.druid.segment.incremental.SimpleRowIngestionMeters;
 import org.apache.druid.segment.transform.TransformSpec;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -49,7 +46,6 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -57,7 +53,6 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -73,16 +68,13 @@ public class StreamChunkParserTest
   @Rule
   public ExpectedException expectedException = ExpectedException.none();
 
-  private final RowIngestionMeters rowIngestionMeters = new SimpleRowIngestionMeters();
+  private final RowIngestionMeters rowIngestionMeters = new NoopRowIngestionMeters();
   private final ParseExceptionHandler parseExceptionHandler = new ParseExceptionHandler(
       rowIngestionMeters,
       false,
       0,
       0
   );
-
-  @Mock
-  private SettableByteEntityReader mockedByteEntityReader;
 
   @Test
   public void testWithParserAndNullInputformatParseProperly() throws IOException
@@ -99,7 +91,7 @@ public class StreamChunkParserTest
     );
     final StreamChunkParser<ByteEntity> chunkParser = new StreamChunkParser<>(
         parser,
-        // Set nulls for all parameters below since inputFormat will never be used.
+        // Set nulls for all parameters below since inputFormat will be never used.
         null,
         null,
         null,
@@ -184,6 +176,7 @@ public class StreamChunkParserTest
         JSONPathSpec.DEFAULT,
         Collections.emptyMap()
     );
+    RowIngestionMeters mockRowIngestionMeters = Mockito.mock(RowIngestionMeters.class);
     final StreamChunkParser<ByteEntity> chunkParser = new StreamChunkParser<>(
         null,
         inputFormat,
@@ -191,13 +184,12 @@ public class StreamChunkParserTest
         TransformSpec.NONE,
         temporaryFolder.newFolder(),
         row -> true,
-        rowIngestionMeters,
+        mockRowIngestionMeters,
         parseExceptionHandler
     );
     List<InputRow> parsedRows = chunkParser.parse(ImmutableList.of(), false);
     Assert.assertEquals(0, parsedRows.size());
-    Assert.assertEquals(0, rowIngestionMeters.getUnparseable());
-    Assert.assertEquals(1, rowIngestionMeters.getThrownAway());
+    Mockito.verify(mockRowIngestionMeters).incrementThrownAway();
   }
 
   @Test
@@ -207,6 +199,7 @@ public class StreamChunkParserTest
         JSONPathSpec.DEFAULT,
         Collections.emptyMap()
     );
+    RowIngestionMeters mockRowIngestionMeters = Mockito.mock(RowIngestionMeters.class);
     final StreamChunkParser<ByteEntity> chunkParser = new StreamChunkParser<>(
         null,
         inputFormat,
@@ -214,151 +207,12 @@ public class StreamChunkParserTest
         TransformSpec.NONE,
         temporaryFolder.newFolder(),
         row -> true,
-        rowIngestionMeters,
+        mockRowIngestionMeters,
         parseExceptionHandler
     );
     List<InputRow> parsedRows = chunkParser.parse(ImmutableList.of(), true);
     Assert.assertEquals(0, parsedRows.size());
-    Assert.assertEquals(0, rowIngestionMeters.getUnparseable());
-    Assert.assertEquals(0, rowIngestionMeters.getThrownAway());
-  }
-
-  @Test
-  public void testParseMalformedDataWithAllowedParseExceptions_thenNoException() throws IOException
-  {
-    final InputRowParser<ByteBuffer> parser = new StringInputRowParser(
-        new JSONParseSpec(
-            TIMESTAMP_SPEC,
-            DimensionsSpec.EMPTY,
-            JSONPathSpec.DEFAULT,
-            Collections.emptyMap(),
-            false
-        ),
-        StringUtils.UTF8_STRING
-    );
-
-    final int maxAllowedParseExceptions = 1;
-    final StreamChunkParser<ByteEntity> chunkParser = new StreamChunkParser<>(
-        parser,
-        mockedByteEntityReader,
-        row -> true,
-        rowIngestionMeters,
-        new ParseExceptionHandler(
-            rowIngestionMeters,
-            false,
-            maxAllowedParseExceptions,
-            0
-        )
-    );
-    Mockito.when(mockedByteEntityReader.read()).thenThrow(new ParseException(null, "error parsing malformed data"));
-    final String json = "malformedJson";
-
-    List<InputRow> parsedRows = chunkParser.parse(
-        Collections.singletonList(
-            new ByteEntity(json.getBytes(StringUtils.UTF8_STRING))), false
-    );
-    // no exception and no parsed rows
-    Assert.assertEquals(0, parsedRows.size());
-    Assert.assertEquals(maxAllowedParseExceptions, rowIngestionMeters.getUnparseable());
-  }
-
-  @Test
-  public void testParseMalformedDataException() throws IOException
-  {
-    final InputRowParser<ByteBuffer> parser = new StringInputRowParser(
-        new JSONParseSpec(
-            TIMESTAMP_SPEC,
-            DimensionsSpec.EMPTY,
-            JSONPathSpec.DEFAULT,
-            Collections.emptyMap(),
-            false
-        ),
-        StringUtils.UTF8_STRING
-    );
-
-    final StreamChunkParser<ByteEntity> chunkParser = new StreamChunkParser<>(
-        parser,
-        mockedByteEntityReader,
-        row -> true,
-        rowIngestionMeters,
-        parseExceptionHandler
-    );
-
-    Mockito.when(mockedByteEntityReader.read()).thenThrow(new ParseException(null, "error parsing malformed data"));
-    final String json = "malformedJson";
-    List<ByteEntity> byteEntities = Arrays.asList(
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING))
-    );
-    Assert.assertThrows(
-        "Max parse exceptions[0] exceeded",
-        RE.class,
-        () -> chunkParser.parse(byteEntities, false)
-    );
-    Assert.assertEquals(1, rowIngestionMeters.getUnparseable()); // should barf on the first unparseable row
-  }
-
-  @Test
-  public void testParseMalformedDataWithUnlimitedAllowedParseExceptions_thenNoException() throws IOException
-  {
-    final InputRowParser<ByteBuffer> parser = new StringInputRowParser(
-        new JSONParseSpec(
-            TIMESTAMP_SPEC,
-            DimensionsSpec.EMPTY,
-            JSONPathSpec.DEFAULT,
-            Collections.emptyMap(),
-            false
-        ),
-        StringUtils.UTF8_STRING
-    );
-
-    final StreamChunkParser<ByteEntity> chunkParser = new StreamChunkParser<>(
-        parser,
-        mockedByteEntityReader,
-        row -> true,
-        rowIngestionMeters,
-        new ParseExceptionHandler(
-            rowIngestionMeters,
-            false,
-            Integer.MAX_VALUE,
-            0
-        )
-    );
-
-    Mockito.when(mockedByteEntityReader.read()).thenThrow(new ParseException(null, "error parsing malformed data"));
-    final String json = "malformedJson";
-
-    List<ByteEntity> byteEntities = Arrays.asList(
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING)),
-        new ByteEntity(json.getBytes(StringUtils.UTF8_STRING))
-    );
-
-    List<InputRow> parsedRows = chunkParser.parse(byteEntities, false);
-    // no exception since we've unlimited threhold for parse exceptions
-    Assert.assertEquals(0, parsedRows.size());
-    Assert.assertEquals(byteEntities.size(), rowIngestionMeters.getUnparseable());
-  }
-
-  @Test
-  public void testWithNullParserAndNullByteEntityReaderFailToInstantiate()
-  {
-    Assert.assertThrows(
-        "Either parser or byteEntityReader should be set",
-        IAE.class,
-        () -> new StreamChunkParser<>(
-            null,
-            null,
-            row -> true,
-            rowIngestionMeters,
-            parseExceptionHandler
-        )
-    );
+    Mockito.verifyNoInteractions(mockRowIngestionMeters);
   }
 
   private void parseAndAssertResult(StreamChunkParser<ByteEntity> chunkParser) throws IOException
@@ -370,7 +224,6 @@ public class StreamChunkParserTest
     Assert.assertEquals(DateTimes.of("2020-01-01"), row.getTimestamp());
     Assert.assertEquals("val", Iterables.getOnlyElement(row.getDimension("dim")));
     Assert.assertEquals("val2", Iterables.getOnlyElement(row.getDimension("met")));
-    Assert.assertEquals(0, rowIngestionMeters.getUnparseable());
   }
 
   private static class TrackingJsonInputFormat extends JsonInputFormat

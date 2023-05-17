@@ -322,7 +322,15 @@ public class SqlNestedDataBenchmark
         schemaInfo,
         dimsSpec,
         transformSpec,
-        IndexSpec.builder().withStringDictionaryEncoding(encodingStrategy).build(),
+        new IndexSpec(
+            null,
+            null,
+            encodingStrategy,
+            null,
+            null,
+            null,
+            null
+        ),
         Granularities.NONE,
         rowsPerSegment
     );

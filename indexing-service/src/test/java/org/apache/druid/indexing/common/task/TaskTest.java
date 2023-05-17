@@ -121,7 +121,7 @@ public class TaskTest
   };
 
   @Test
-  public void testGetInputSourceResources()
+  public void testGetInputSourceTypes()
   {
     Assert.assertThrows(
         UOE.class,

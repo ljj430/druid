@@ -1326,9 +1326,7 @@ public class SqlResourceTest extends CalciteTestBase
                     "false"
                 ),
                 "RESOURCES",
-                "[{\"name\":\"foo\",\"type\":\"DATASOURCE\"}]",
-                "ATTRIBUTES",
-                "{\"statementType\":\"SELECT\",\"targetDataSource\":null}"
+                "[{\"name\":\"foo\",\"type\":\"DATASOURCE\"}]"
             )
         ),
         rows

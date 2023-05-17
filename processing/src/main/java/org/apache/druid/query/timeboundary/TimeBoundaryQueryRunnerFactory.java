@@ -37,7 +37,6 @@ import org.apache.druid.query.QueryRunnerHelper;
 import org.apache.druid.query.QueryToolChest;
 import org.apache.druid.query.QueryWatcher;
 import org.apache.druid.query.Result;
-import org.apache.druid.query.TableDataSource;
 import org.apache.druid.query.context.ResponseContext;
 import org.apache.druid.segment.BaseLongColumnValueSelector;
 import org.apache.druid.segment.Cursor;
@@ -46,7 +45,6 @@ import org.apache.druid.segment.StorageAdapter;
 import org.apache.druid.segment.VirtualColumns;
 import org.apache.druid.segment.column.ColumnHolder;
 import org.apache.druid.segment.filter.Filters;
-import org.apache.druid.utils.CollectionUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
@@ -54,7 +52,6 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- *
  */
 public class TimeBoundaryQueryRunnerFactory
     implements QueryRunnerFactory<Result<TimeBoundaryResultValue>, TimeBoundaryQuery>
@@ -145,7 +142,7 @@ public class TimeBoundaryQueryRunnerFactory
         throw new ISE("Got a [%s] which isn't a %s", input.getClass(), TimeBoundaryQuery.class);
       }
 
-      final TimeBoundaryQuery query = (TimeBoundaryQuery) input;
+      final TimeBoundaryQuery legacyQuery = (TimeBoundaryQuery) input;
 
       return new BaseSequence<>(
           new BaseSequence.IteratorMaker<Result<TimeBoundaryResultValue>, Iterator<Result<TimeBoundaryResultValue>>>()
@@ -158,31 +155,26 @@ public class TimeBoundaryQueryRunnerFactory
                     "Null storage adapter found. Probably trying to issue a query against a segment being memory unmapped."
                 );
               }
+              final DateTime minTime;
+              final DateTime maxTime;
 
-              DateTime minTime = null;
-              DateTime maxTime = null;
-
-              if (canUseAdapterMinMaxTime(query, adapter)) {
-                if (!query.isMaxTime()) {
-                  minTime = adapter.getMinTime();
-                }
-
-                if (!query.isMinTime()) {
-                  maxTime = adapter.getMaxTime();
+              if (legacyQuery.getFilter() != null || !queryIntervalContainsAdapterInterval()) {
+                minTime = getTimeBoundary(adapter, legacyQuery, false);
+                if (minTime == null) {
+                  maxTime = null;
+                } else {
+                  maxTime = getTimeBoundary(adapter, legacyQuery, true);
                 }
               } else {
-                if (!query.isMaxTime()) {
-                  minTime = getTimeBoundary(adapter, query, false);
-                }
-
-                if (!query.isMinTime()) {
-                  if (query.isMaxTime() || minTime != null) {
-                    maxTime = getTimeBoundary(adapter, query, true);
-                  }
-                }
+                minTime = legacyQuery.getBound().equalsIgnoreCase(TimeBoundaryQuery.MAX_TIME)
+                          ? null
+                          : adapter.getMinTime();
+                maxTime = legacyQuery.getBound().equalsIgnoreCase(TimeBoundaryQuery.MIN_TIME)
+                          ? null
+                          : adapter.getMaxTime();
               }
 
-              return query.buildResult(
+              return legacyQuery.buildResult(
                   adapter.getInterval().getStart(),
                   minTime,
                   maxTime
@@ -194,42 +186,17 @@ public class TimeBoundaryQueryRunnerFactory
             {
 
             }
+
+            private boolean queryIntervalContainsAdapterInterval()
+            {
+              List<Interval> queryIntervals = legacyQuery.getQuerySegmentSpec().getIntervals();
+              if (queryIntervals.size() != 1) {
+                throw new IAE("Should only have one interval, got[%s]", queryIntervals);
+              }
+              return queryIntervals.get(0).contains(adapter.getInterval());
+            }
           }
       );
     }
-  }
-
-  /**
-   * Whether a particular {@link TimeBoundaryQuery} can use {@link StorageAdapter#getMinTime()} and/or
-   * {@link StorageAdapter#getMaxTime()}. If false, must use {@link StorageAdapter#makeCursors}.
-   */
-  private static boolean canUseAdapterMinMaxTime(final TimeBoundaryQuery query, final StorageAdapter adapter)
-  {
-    if (query.getFilter() != null) {
-      // We have to check which rows actually match the filter.
-      return false;
-    }
-
-    if (!(query.getDataSource() instanceof TableDataSource)) {
-      // In general, minTime / maxTime are only guaranteed to match data for regular tables.
-      //
-      // One example: an INNER JOIN can act as a filter and remove some rows. Another example: RowBasedStorageAdapter
-      // (used by e.g. inline data) uses nominal interval, not actual data, for minTime / maxTime.
-      return false;
-    }
-
-    final Interval queryInterval = CollectionUtils.getOnlyElement(
-        query.getQuerySegmentSpec().getIntervals(),
-        xs -> new IAE("Should only have one interval, got[%s]", xs)
-    );
-
-    if (!queryInterval.contains(adapter.getInterval())) {
-      // Query interval does not contain adapter interval. Need to create a cursor to see the first
-      // timestamp within the query interval.
-      return false;
-    }
-
-    // Passed all checks.
-    return true;
   }
 }

@@ -125,10 +125,10 @@ public class KinesisSupervisorSpec extends SeekableStreamSupervisorSpec
   @Nonnull
   @JsonIgnore
   @Override
-  public Set<ResourceAction> getInputSourceResources()
+  public Set<ResourceAction> getInputSourceTypes()
   {
     return Collections.singleton(new ResourceAction(
-        new Resource(SUPERVISOR_TYPE, ResourceType.EXTERNAL),
+        new Resource(ResourceType.EXTERNAL, SUPERVISOR_TYPE),
         Action.READ
     ));
   }

@@ -224,7 +224,7 @@ public interface Expr extends Cacheable
         if (argType == null) {
           continue;
         }
-        numeric = numeric && argType.isNumeric();
+        numeric &= argType.isNumeric();
       }
       return numeric;
     }
@@ -265,7 +265,7 @@ public interface Expr extends Cacheable
         if (currentType == null) {
           currentType = argType;
         }
-        allSame = allSame && Objects.equals(argType, currentType);
+        allSame &= Objects.equals(argType, currentType);
       }
       return allSame;
     }
@@ -302,7 +302,7 @@ public interface Expr extends Cacheable
         if (argType == null) {
           continue;
         }
-        scalar = scalar && argType.isPrimitive();
+        scalar &= argType.isPrimitive();
       }
       return scalar;
     }
@@ -330,7 +330,7 @@ public interface Expr extends Cacheable
     {
       boolean canVectorize = true;
       for (Expr arg : args) {
-        canVectorize = canVectorize && arg.canVectorize(this);
+        canVectorize &= arg.canVectorize(this);
       }
       return canVectorize;
     }

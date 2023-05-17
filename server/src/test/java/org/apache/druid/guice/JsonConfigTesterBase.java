@@ -156,7 +156,7 @@ public abstract class JsonConfigTesterBase<T>
       throws IllegalAccessException, NoSuchMethodException, InvocationTargetException
   {
     configProvider.inject(testProperties, configurator);
-    validateEntries(configProvider.get());
+    validateEntries(configProvider.get().get());
     Assert.assertEquals(propertyValues.size(), assertions);
   }
 

@@ -103,7 +103,8 @@ public class IndexedTableJoinable implements Joinable
     }
 
     try (final IndexedTable.Reader reader = table.columnReader(columnPosition)) {
-      // Use a SortedSet so InDimFilter doesn't need to create its own
+      // Sorted set to encourage "in" filters that result from this method to do dictionary lookups in order.
+      // The hopes are that this will improve locality and therefore improve performance.
       final Set<String> allValues = createValuesSet();
       boolean allUnique = true;
 

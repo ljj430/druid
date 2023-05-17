@@ -58,7 +58,6 @@ import org.apache.druid.guice.PolyBind;
 import org.apache.druid.guice.QueryRunnerFactoryModule;
 import org.apache.druid.guice.QueryableModule;
 import org.apache.druid.guice.QueryablePeonModule;
-import org.apache.druid.guice.SegmentWranglerModule;
 import org.apache.druid.guice.ServerTypeConfig;
 import org.apache.druid.guice.annotations.AttemptId;
 import org.apache.druid.guice.annotations.Json;
@@ -68,6 +67,7 @@ import org.apache.druid.indexing.common.RetryPolicyConfig;
 import org.apache.druid.indexing.common.RetryPolicyFactory;
 import org.apache.druid.indexing.common.SingleFileTaskReportFileWriter;
 import org.apache.druid.indexing.common.TaskReportFileWriter;
+import org.apache.druid.indexing.common.TaskStorageDirTracker;
 import org.apache.druid.indexing.common.TaskToolboxFactory;
 import org.apache.druid.indexing.common.actions.LocalTaskActionClientFactory;
 import org.apache.druid.indexing.common.actions.RemoteTaskActionClientFactory;
@@ -109,7 +109,6 @@ import org.apache.druid.segment.loading.DataSegmentMover;
 import org.apache.druid.segment.loading.OmniDataSegmentArchiver;
 import org.apache.druid.segment.loading.OmniDataSegmentKiller;
 import org.apache.druid.segment.loading.OmniDataSegmentMover;
-import org.apache.druid.segment.loading.StorageLocation;
 import org.apache.druid.segment.realtime.appenderator.AppenderatorsManager;
 import org.apache.druid.segment.realtime.appenderator.PeonAppenderatorsManager;
 import org.apache.druid.segment.realtime.firehose.ChatHandlerProvider;
@@ -127,7 +126,6 @@ import org.apache.druid.server.initialization.jetty.JettyServerInitializer;
 import org.apache.druid.server.metrics.DataSourceTaskIdHolder;
 import org.eclipse.jetty.server.Server;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.List;
@@ -146,10 +144,10 @@ public class CliPeon extends GuiceRunnable
 {
   @SuppressWarnings("WeakerAccess")
   @Required
-  @Arguments(description = "taskDirPath attemptId")
+  @Arguments(description = "baseTaskDirPath taskId attemptId")
   public List<String> taskAndStatusFile;
 
-  // path to the task Directory
+  // path to the base task Directory
   private String taskDirPath;
 
   // the attemptId
@@ -194,7 +192,6 @@ public class CliPeon extends GuiceRunnable
         new DruidProcessingModule(),
         new QueryableModule(),
         new QueryRunnerFactoryModule(),
-        new SegmentWranglerModule(),
         new JoinableFactoryModule(),
         new IndexingServiceTaskLogsModule(),
         new Module()
@@ -203,8 +200,8 @@ public class CliPeon extends GuiceRunnable
           @Override
           public void configure(Binder binder)
           {
-            taskDirPath = taskAndStatusFile.get(0);
-            attemptId = taskAndStatusFile.get(1);
+            taskDirPath = Paths.get(taskAndStatusFile.get(0), taskAndStatusFile.get(1)).toAbsolutePath().toString();
+            attemptId = taskAndStatusFile.get(2);
 
             binder.bindConstant().annotatedWith(Names.named("serviceName")).to("druid/peon");
             binder.bindConstant().annotatedWith(Names.named("servicePort")).to(0);
@@ -224,7 +221,11 @@ public class CliPeon extends GuiceRunnable
             LifecycleModule.register(binder, ExecutorLifecycle.class);
             ExecutorLifecycleConfig executorLifecycleConfig = new ExecutorLifecycleConfig()
                 .setTaskFile(Paths.get(taskDirPath, "task.json").toFile())
-                .setStatusFile(Paths.get(taskDirPath, "attempt", attemptId, "status.json").toFile());
+                .setStatusFile(Paths.get(taskDirPath, "attempt", attemptId, "status.json").toFile())
+                .setLockFile(Paths.get(taskDirPath, "lock").toFile());
+
+            TaskStorageDirTracker dirTracker = new TaskStorageDirTracker(ImmutableList.of(taskAndStatusFile.get(0)));
+            binder.bind(TaskStorageDirTracker.class).toInstance(dirTracker);
 
             if ("k8s".equals(properties.getProperty("druid.indexer.runner.type", null))) {
               log.info("Running peon in k8s mode");
@@ -256,7 +257,13 @@ public class CliPeon extends GuiceRunnable
             LifecycleModule.register(binder, Server.class);
 
             if ("true".equals(loadBroadcastSegments)) {
-              binder.install(new BroadcastSegmentLoadingModule());
+              binder.bind(SegmentManager.class).in(LazySingleton.class);
+              binder.bind(ZkCoordinator.class).in(ManageLifecycle.class);
+              Jerseys.addResource(binder, HistoricalResource.class);
+
+              if (isZkEnabled) {
+                LifecycleModule.register(binder, ZkCoordinator.class);
+              }
             }
           }
 
@@ -487,29 +494,5 @@ public class CliPeon extends GuiceRunnable
     );
     shuffleClientBiddy.addBinding("local").to(HttpShuffleClient.class).in(LazySingleton.class);
     shuffleClientBiddy.addBinding("deepstore").to(DeepStorageShuffleClient.class).in(LazySingleton.class);
-  }
-
-  public class BroadcastSegmentLoadingModule implements Module
-  {
-    @Override
-    public void configure(Binder binder)
-    {
-      binder.bind(SegmentManager.class).in(LazySingleton.class);
-      binder.bind(ZkCoordinator.class).in(ManageLifecycle.class);
-      Jerseys.addResource(binder, HistoricalResource.class);
-
-      if (isZkEnabled) {
-        LifecycleModule.register(binder, ZkCoordinator.class);
-      }
-    }
-
-    @Provides
-    @LazySingleton
-    public List<StorageLocation> getCliPeonStorageLocations(TaskConfig config)
-    {
-      File broadcastStorage = new File(new File(taskDirPath, "broadcast"), "segments");
-
-      return ImmutableList.of(new StorageLocation(broadcastStorage, config.getTmpStorageBytesPerTask(), null));
-    }
   }
 }

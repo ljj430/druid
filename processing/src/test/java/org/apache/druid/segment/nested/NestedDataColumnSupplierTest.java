@@ -48,9 +48,7 @@ import org.apache.druid.segment.ObjectColumnSelector;
 import org.apache.druid.segment.SimpleAscendingOffset;
 import org.apache.druid.segment.TestHelper;
 import org.apache.druid.segment.column.ColumnBuilder;
-import org.apache.druid.segment.column.ColumnCapabilities;
 import org.apache.druid.segment.column.ColumnConfig;
-import org.apache.druid.segment.column.ColumnHolder;
 import org.apache.druid.segment.column.ColumnIndexSupplier;
 import org.apache.druid.segment.column.ColumnType;
 import org.apache.druid.segment.column.DruidPredicateIndex;
@@ -58,8 +56,6 @@ import org.apache.druid.segment.column.NullValueIndex;
 import org.apache.druid.segment.column.StringValueSetIndex;
 import org.apache.druid.segment.data.BitmapSerdeFactory;
 import org.apache.druid.segment.data.RoaringBitmapSerdeFactory;
-import org.apache.druid.segment.serde.ColumnPartSerde;
-import org.apache.druid.segment.serde.NestedCommonFormatColumnPartSerde;
 import org.apache.druid.segment.vector.BitmapVectorOffset;
 import org.apache.druid.segment.vector.NoFilterVectorOffset;
 import org.apache.druid.segment.vector.VectorObjectSelector;
@@ -195,7 +191,7 @@ public class NestedDataColumnSupplierTest extends InitializedNullHandlingTest
     try (final FileSmoosher smoosher = new FileSmoosher(tmpFile)) {
       NestedDataColumnSerializer serializer = new NestedDataColumnSerializer(
           fileNameBase,
-          IndexSpec.DEFAULT,
+          new IndexSpec(),
           writeOutMediumFactory.makeSegmentWriteOutMedium(tempFolder.newFolder()),
           closer
       );
@@ -249,22 +245,16 @@ public class NestedDataColumnSupplierTest extends InitializedNullHandlingTest
   public void testBasicFunctionality() throws IOException
   {
     ColumnBuilder bob = new ColumnBuilder();
-    NestedCommonFormatColumnPartSerde partSerde = NestedCommonFormatColumnPartSerde.createDeserializer(
-        ColumnType.NESTED_DATA,
-        false,
-        false,
-        ByteOrder.nativeOrder(),
-        RoaringBitmapSerdeFactory.getInstance()
-    );
     bob.setFileMapper(fileMapper);
-    ColumnPartSerde.Deserializer deserializer = partSerde.getDeserializer();
-    deserializer.read(baseBuffer, bob, ALWAYS_USE_INDEXES);
-    final ColumnHolder holder = bob.build();
-    final ColumnCapabilities capabilities = holder.getCapabilities();
-    Assert.assertEquals(ColumnType.NESTED_DATA, capabilities.toColumnType());
-    Assert.assertTrue(capabilities.isFilterable());
-    Assert.assertTrue(holder.getColumnFormat() instanceof NestedCommonFormatColumn.Format);
-    try (NestedDataComplexColumn column = (NestedDataComplexColumn) holder.getColumn()) {
+    NestedDataColumnSupplier supplier = NestedDataColumnSupplier.read(
+        false,
+        baseBuffer,
+        bob,
+        ALWAYS_USE_INDEXES,
+        bitmapSerdeFactory,
+        ByteOrder.nativeOrder()
+    );
+    try (NestedDataComplexColumn column = (NestedDataComplexColumn) supplier.get()) {
       smokeTest(column);
     }
   }
@@ -273,22 +263,16 @@ public class NestedDataColumnSupplierTest extends InitializedNullHandlingTest
   public void testArrayFunctionality() throws IOException
   {
     ColumnBuilder bob = new ColumnBuilder();
-    NestedCommonFormatColumnPartSerde partSerde = NestedCommonFormatColumnPartSerde.createDeserializer(
-        ColumnType.NESTED_DATA,
-        false,
-        false,
-        ByteOrder.nativeOrder(),
-        RoaringBitmapSerdeFactory.getInstance()
-    );
     bob.setFileMapper(arrayFileMapper);
-    ColumnPartSerde.Deserializer deserializer = partSerde.getDeserializer();
-    deserializer.read(arrayBaseBuffer, bob, ALWAYS_USE_INDEXES);
-    final ColumnHolder holder = bob.build();
-    final ColumnCapabilities capabilities = holder.getCapabilities();
-    Assert.assertEquals(ColumnType.NESTED_DATA, capabilities.toColumnType());
-    Assert.assertTrue(capabilities.isFilterable());
-    Assert.assertTrue(holder.getColumnFormat() instanceof NestedCommonFormatColumn.Format);
-    try (NestedDataComplexColumn column = (NestedDataComplexColumn) holder.getColumn()) {
+    NestedDataColumnSupplier supplier = NestedDataColumnSupplier.read(
+        false,
+        arrayBaseBuffer,
+        bob,
+        () -> 0,
+        bitmapSerdeFactory,
+        ByteOrder.nativeOrder()
+    );
+    try (NestedDataComplexColumn column = (NestedDataComplexColumn) supplier.get()) {
       smokeTestArrays(column);
     }
   }
@@ -735,14 +719,12 @@ public class NestedDataColumnSupplierTest extends InitializedNullHandlingTest
       Assert.assertNull(dimSelector.getObject());
       Assert.assertNull(dimSelector.lookupName(dimSelector.getRow().get(0)));
 
-      Assert.assertTrue(nullValueIndex.forNull().computeBitmapResult(resultFactory).get(rowNumber));
       Assert.assertTrue(valueSetIndex.forValue(null).computeBitmapResult(resultFactory).get(rowNumber));
+      Assert.assertFalse(valueSetIndex.forValue(NO_MATCH).computeBitmapResult(resultFactory).get(rowNumber));
+      Assert.assertTrue(nullValueIndex.forNull().computeBitmapResult(resultFactory).get(rowNumber));
       Assert.assertTrue(predicateIndex.forPredicate(new SelectorPredicateFactory(null))
                                       .computeBitmapResult(resultFactory)
                                       .get(rowNumber));
-      Assert.assertFalse(valueSetIndex.forValue(NO_MATCH).computeBitmapResult(resultFactory).get(rowNumber));
-
-
       Assert.assertFalse(valueSetIndex.forValue(NO_MATCH).computeBitmapResult(resultFactory).get(rowNumber));
       Assert.assertFalse(predicateIndex.forPredicate(new SelectorPredicateFactory(NO_MATCH))
                                        .computeBitmapResult(resultFactory)

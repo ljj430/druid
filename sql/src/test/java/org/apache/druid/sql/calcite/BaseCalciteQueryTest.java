@@ -170,9 +170,6 @@ public class BaseCalciteQueryTest extends CalciteTestBase
   public static final PlannerConfig PLANNER_CONFIG_AUTHORIZE_SYS_TABLES =
       PlannerConfig.builder().authorizeSystemTablesDirectly(true).build();
 
-  public static final PlannerConfig PLANNER_CONFIG_LEGACY_QUERY_EXPLAIN =
-      PlannerConfig.builder().useNativeQueryExplain(false).build();
-
   public static final PlannerConfig PLANNER_CONFIG_NATIVE_QUERY_EXPLAIN =
       PlannerConfig.builder().useNativeQueryExplain(true).build();
 
@@ -270,7 +267,7 @@ public class BaseCalciteQueryTest extends CalciteTestBase
 
   public boolean cannotVectorize = false;
   public boolean skipVectorize = false;
-  public boolean msqCompatible = true;
+  public boolean msqCompatible = false;
 
   public QueryLogHook queryLogHook;
 
@@ -995,7 +992,7 @@ public class BaseCalciteQueryTest extends CalciteTestBase
    * factory is specific to one test and one planner config. This method can be
    * overridden to control the objects passed to the factory.
    */
-  SqlStatementFactory getSqlStatementFactory(
+  private SqlStatementFactory getSqlStatementFactory(
       PlannerConfig plannerConfig,
       AuthConfig authConfig
   )
@@ -1013,9 +1010,9 @@ public class BaseCalciteQueryTest extends CalciteTestBase
     skipVectorize = true;
   }
 
-  protected void notMsqCompatible()
+  protected void msqCompatible()
   {
-    msqCompatible = false;
+    msqCompatible = true;
   }
 
   protected static boolean isRewriteJoinToFilter(final Map<String, Object> queryContext)

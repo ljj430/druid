@@ -50,6 +50,7 @@ public class S3OutputSerdeTest
                                            + "  \"prefix\": \"abc\",\n"
                                            + "  \"tempDir\": \"/tmp\",\n"
                                            + "  \"chunkSize\":104857600,\n"
+                                           + "  \"maxResultsSize\":209715200,\n"
                                            + "  \"maxRetry\": 2\n"
                                            + "}\n");
 
@@ -58,6 +59,7 @@ public class S3OutputSerdeTest
         "abc",
         new File("/tmp"),
         HumanReadableBytes.valueOf(HumanReadableBytes.parse("100Mib")),
+        HumanReadableBytes.valueOf(HumanReadableBytes.parse("200Mib")),
         2
     );
 
@@ -76,6 +78,7 @@ public class S3OutputSerdeTest
                                            + "  \"bucket\": \"TEST\",\n"
                                            + "  \"tempDir\": \"/tmp\",\n"
                                            + "  \"chunkSize\":104857600,\n"
+                                           + "  \"maxResultsSize\":209715200,\n"
                                            + "  \"maxRetry\": 2\n"
                                            + "}\n");
     expectedException.expect(MismatchedInputException.class);
@@ -90,6 +93,7 @@ public class S3OutputSerdeTest
                                            + "  \"prefix\": \"abc\",\n"
                                            + "  \"tempDir\": \"/tmp\",\n"
                                            + "  \"chunkSize\":104857600,\n"
+                                           + "  \"maxResultsSize\":209715200,\n"
                                            + "  \"maxRetry\": 2\n"
                                            + "}\n");
     expectedException.expect(MismatchedInputException.class);
@@ -104,6 +108,7 @@ public class S3OutputSerdeTest
                                            + "  \"prefix\": \"abc\",\n"
                                            + "  \"bucket\": \"TEST\",\n"
                                            + "  \"chunkSize\":104857600,\n"
+                                           + "  \"maxResultsSize\":209715200,\n"
                                            + "  \"maxRetry\": 2\n"
                                            + "}\n");
     expectedException.expect(MismatchedInputException.class);
@@ -125,6 +130,7 @@ public class S3OutputSerdeTest
         "abc",
         new File("/tmp"),
         null,
+        null,
         null
     );
     Assert.assertEquals(s3OutputConfig, MAPPER.readValue(json, S3OutputConfig.class));
@@ -140,6 +146,7 @@ public class S3OutputSerdeTest
                                            + "  \"bucket\": \"TEST\",\n"
                                            + "  \"tempDir\": \"/tmp\",\n"
                                            + "  \"chunkSize\":104,\n"
+                                           + "  \"maxResultsSize\":209715200,\n"
                                            + "  \"maxRetry\": 2\n"
                                            + "}\n");
     expectedException.expect(ValueInstantiationException.class);

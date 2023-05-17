@@ -27,7 +27,6 @@ import org.apache.druid.frame.key.RowKey;
 import org.apache.druid.java.util.common.IAE;
 import org.apache.druid.java.util.common.ISE;
 import org.apache.druid.java.util.common.StringUtils;
-import org.apache.druid.msq.exec.Limits;
 import org.apache.druid.msq.indexing.error.MSQFault;
 import org.apache.druid.msq.indexing.error.UnknownFault;
 import org.apache.druid.msq.input.InputSpecSlicerFactory;
@@ -233,8 +232,7 @@ public class BaseControllerQueryKernelTest extends InitializedNullHandlingTest
       return mapStageIdsToStageNumbers(
           controllerQueryKernel.createAndGetNewStageIds(
               inputSlicerFactory,
-              WorkerAssignmentStrategy.MAX,
-              Limits.DEFAULT_MAX_INPUT_BYTES_PER_WORKER
+              WorkerAssignmentStrategy.MAX
           )
       );
     }

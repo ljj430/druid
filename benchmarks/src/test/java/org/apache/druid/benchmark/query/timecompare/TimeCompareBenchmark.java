@@ -336,7 +336,7 @@ public class TimeCompareBenchmark
       File indexFile = INDEX_MERGER_V9.persist(
           incIndexes.get(i),
           tmpDir,
-          IndexSpec.DEFAULT,
+          new IndexSpec(),
           null
       );
 

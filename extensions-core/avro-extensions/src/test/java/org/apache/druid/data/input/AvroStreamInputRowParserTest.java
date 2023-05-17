@@ -76,7 +76,6 @@ public class AvroStreamInputRowParserTest
   private static final String ID = "id";
   private static final String SOME_OTHER_ID = "someOtherId";
   private static final String IS_VALID = "isValid";
-  private static final String NESTED_ARRAY_VAL = "nestedArrayVal";
   private static final String TOPIC = "aTopic";
   private static final String EVENT_TYPE_VALUE = "type-a";
   private static final long ID_VALUE = 1976491L;
@@ -85,9 +84,8 @@ public class AvroStreamInputRowParserTest
   private static final int SOME_INT_VALUE = 1;
   private static final long SOME_LONG_VALUE = 679865987569912369L;
   private static final ZonedDateTime DATE_TIME = ZonedDateTime.of(2015, 10, 25, 19, 30, 0, 0, ZoneOffset.UTC);
-  static final List<String> DIMENSIONS = Arrays.asList(EVENT_TYPE, ID, SOME_OTHER_ID, IS_VALID, NESTED_ARRAY_VAL);
+  static final List<String> DIMENSIONS = Arrays.asList(EVENT_TYPE, ID, SOME_OTHER_ID, IS_VALID);
   private static final List<String> DIMENSIONS_SCHEMALESS = Arrays.asList(
-      NESTED_ARRAY_VAL,
       SOME_OTHER_ID,
       "someIntArray",
       "someFloat",
@@ -107,8 +105,7 @@ public class AvroStreamInputRowParserTest
       new JSONPathSpec(
           true,
           ImmutableList.of(
-              new JSONPathFieldSpec(JSONPathFieldType.PATH, "nested", "someRecord.subLong"),
-              new JSONPathFieldSpec(JSONPathFieldType.PATH, "nestedArrayVal", "someRecordArray[?(@.nestedString=='string in record')].nestedString")
+              new JSONPathFieldSpec(JSONPathFieldType.PATH, "nested", "someRecord.subLong")
           )
       )
   );
@@ -118,9 +115,7 @@ public class AvroStreamInputRowParserTest
       new JSONPathSpec(
           true,
           ImmutableList.of(
-              new JSONPathFieldSpec(JSONPathFieldType.PATH, "nested", "someRecord.subLong"),
-              new JSONPathFieldSpec(JSONPathFieldType.PATH, "nestedArrayVal", "someRecordArray[?(@.nestedString=='string in record')].nestedString")
-
+              new JSONPathFieldSpec(JSONPathFieldType.PATH, "nested", "someRecord.subLong")
           )
       )
   );
@@ -369,14 +364,6 @@ public class AvroStreamInputRowParserTest
     LinkedHashMap someRecord = (LinkedHashMap) someRecordObj;
     Assert.assertEquals(4892, someRecord.get("subInt"));
     Assert.assertEquals(1543698L, someRecord.get("subLong"));
-
-    final Object someList = inputRow.getDimension("nestedArrayVal");
-    Assert.assertNotNull(someList);
-    Assert.assertTrue(someList instanceof List);
-    List someRecordObj3List = (List) someList;
-    Assert.assertEquals(1, someRecordObj3List.size());
-    Assert.assertEquals("string in record", someRecordObj3List.get(0));
-
 
     // towards Map avro field as druid dimension, need to convert its toString() back to HashMap to check equality
     Assert.assertEquals(1, inputRow.getDimension("someIntValueMap").size());

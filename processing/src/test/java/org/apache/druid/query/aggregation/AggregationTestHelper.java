@@ -54,13 +54,11 @@ import org.apache.druid.query.QueryRunnerFactory;
 import org.apache.druid.query.QueryRunnerTestHelper;
 import org.apache.druid.query.QueryToolChest;
 import org.apache.druid.query.context.ResponseContext;
-import org.apache.druid.query.groupby.GroupByQuery;
 import org.apache.druid.query.groupby.GroupByQueryConfig;
 import org.apache.druid.query.groupby.GroupByQueryRunnerFactory;
 import org.apache.druid.query.groupby.GroupByQueryRunnerTest;
 import org.apache.druid.query.groupby.ResultRow;
 import org.apache.druid.query.groupby.TestGroupByBuffers;
-import org.apache.druid.query.groupby.epinephelinae.GroupByQueryEngineV2;
 import org.apache.druid.query.scan.ScanQueryConfig;
 import org.apache.druid.query.scan.ScanQueryEngine;
 import org.apache.druid.query.scan.ScanQueryQueryToolChest;
@@ -102,7 +100,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * This class provides general utility to test any druid aggregation implementation given raw data,
@@ -546,7 +543,7 @@ public class AggregationTestHelper implements Closeable
         if (!index.canAppendRow()) {
           File tmp = tempFolder.newFolder();
           toMerge.add(tmp);
-          indexMerger.persist(index, tmp, IndexSpec.DEFAULT, null);
+          indexMerger.persist(index, tmp, new IndexSpec(), null);
           index.close();
           index = new OnheapIncrementalIndex.Builder()
               .setIndexSchema(
@@ -575,19 +572,19 @@ public class AggregationTestHelper implements Closeable
       if (toMerge.size() > 0) {
         File tmp = tempFolder.newFolder();
         toMerge.add(tmp);
-        indexMerger.persist(index, tmp, IndexSpec.DEFAULT, null);
+        indexMerger.persist(index, tmp, new IndexSpec(), null);
 
         List<QueryableIndex> indexes = new ArrayList<>(toMerge.size());
         for (File file : toMerge) {
           indexes.add(indexIO.loadIndex(file));
         }
-        indexMerger.mergeQueryableIndex(indexes, rollup, metrics, outDir, IndexSpec.DEFAULT, null, -1);
+        indexMerger.mergeQueryableIndex(indexes, rollup, metrics, outDir, new IndexSpec(), null, -1);
 
         for (QueryableIndex qi : indexes) {
           qi.close();
         }
       } else {
-        indexMerger.persist(index, outDir, IndexSpec.DEFAULT, null);
+        indexMerger.persist(index, outDir, new IndexSpec(), null);
       }
     }
     finally {
@@ -682,7 +679,7 @@ public class AggregationTestHelper implements Closeable
     if (outDir == null) {
       outDir = tempFolder.newFolder();
     }
-    indexMerger.persist(index, outDir, IndexSpec.DEFAULT, null);
+    indexMerger.persist(index, outDir, new IndexSpec(), null);
 
     return new QueryableIndexSegment(indexIO.loadIndex(outDir), SegmentId.dummy(""));
   }
@@ -788,30 +785,13 @@ public class AggregationTestHelper implements Closeable
           );
           String resultStr = mapper.writer().writeValueAsString(yielder);
 
-          List<ResultRow> resultRows = Lists.transform(
+          List resultRows = Lists.transform(
               readQueryResultArrayFromString(resultStr),
               toolChest.makePreComputeManipulatorFn(
                   queryPlus.getQuery(),
                   MetricManipulatorFns.deserializing()
               )
           );
-
-          // coerce stuff so merge happens right after serde
-          if (queryPlus.getQuery() instanceof GroupByQuery) {
-            List<ResultRow> comparable =
-                resultRows.stream()
-                          .peek(row -> {
-                            GroupByQuery query = (GroupByQuery) queryPlus.getQuery();
-                            GroupByQueryEngineV2.convertRowTypesToOutputTypes(
-                                query.getDimensions(),
-                                row,
-                                query.getResultRowDimensionStart()
-                            );
-                          })
-                          .collect(Collectors.toList());
-
-            return Sequences.simple(comparable);
-          }
           return Sequences.simple(resultRows);
         }
         catch (Exception ex) {

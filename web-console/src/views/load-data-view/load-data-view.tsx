@@ -56,6 +56,7 @@ import {
 } from '../../components';
 import { AsyncActionDialog } from '../../dialogs';
 import type {
+  DimensionMode,
   DimensionSpec,
   DruidFilter,
   FlattenField,
@@ -64,7 +65,6 @@ import type {
   InputFormat,
   IoConfig,
   MetricSpec,
-  SchemaMode,
   TimestampSpec,
   Transform,
   TuningConfig,
@@ -84,6 +84,7 @@ import {
   FILTER_FIELDS,
   FILTERS_FIELDS,
   FLATTEN_FIELD_FIELDS,
+  getDimensionMode,
   getDimensionSpecName,
   getIngestionComboType,
   getIngestionImage,
@@ -94,7 +95,6 @@ import {
   getMetricSpecName,
   getRequiredModule,
   getRollup,
-  getSchemaMode,
   getSecondaryPartitionRelatedFormFields,
   getSpecType,
   getTimestampExpressionFields,
@@ -367,7 +367,7 @@ export interface LoadDataViewState {
   continueToSpec: boolean;
   showResetConfirm: boolean;
   newRollup?: boolean;
-  newSchemaMode?: SchemaMode;
+  newDimensionMode?: DimensionMode;
 
   // welcome
   overlordModules?: string[];
@@ -414,7 +414,6 @@ export interface LoadDataViewState {
   selectedMetricSpec?: SelectedIndex<MetricSpec>;
 
   // for final step
-  existingDatasources?: string[];
   submitting: boolean;
 }
 
@@ -498,10 +497,10 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
       overlordModules = await getProxyOverlordModules();
     } catch (e) {
       AppToaster.show({
-        message: `Failed to get the list of loaded modules from the overlord: ${e.message}`,
+        message: `Failed to get overlord modules: ${e.message}`,
         intent: Intent.DANGER,
       });
-      this.setState({ overlordModules: undefined });
+      this.setState({ overlordModules: [] });
       return;
     }
 
@@ -667,10 +666,8 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
       case 'partition':
       case 'publish':
       case 'tuning':
-        return;
-
       case 'spec':
-        return this.queryForSpec();
+        return;
     }
   }
 
@@ -810,10 +807,9 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
     disabled?: boolean,
   ): JSX.Element | undefined {
     const { overlordModules, selectedComboType, spec } = this.state;
+    if (!overlordModules) return;
     const requiredModule = getRequiredModule(comboType);
-    const goodToGo =
-      !disabled &&
-      (!requiredModule || !overlordModules || overlordModules.includes(requiredModule));
+    const goodToGo = !disabled && (!requiredModule || overlordModules.includes(requiredModule));
 
     return (
       <Card
@@ -1125,7 +1121,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
         <p>
           Please make sure that the
           <Code>&quot;{requiredModule}&quot;</Code> extension is included in the{' '}
-          <Code>druid.extensions.loadList</Code>.
+          <Code>loadList</Code>.
         </p>
         <p>
           For more information please refer to the{' '}
@@ -1998,7 +1994,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
               newSpec = updateSchemaWithSample(
                 newSpec,
                 transformQueryState.data,
-                'fixed',
+                'specific',
                 typeof currentRollup === 'boolean' ? currentRollup : DEFAULT_ROLLUP_SETTING,
               );
             }
@@ -2201,7 +2197,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
               newSpec = updateSchemaWithSample(
                 newSpec,
                 filterQueryState.data,
-                'fixed',
+                'specific',
                 typeof currentRollup === 'boolean' ? currentRollup : DEFAULT_ROLLUP_SETTING,
               );
             }
@@ -2312,7 +2308,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
     const somethingSelected = Boolean(
       selectedAutoDimension || selectedDimensionSpec || selectedMetricSpec,
     );
-    const schemaMode = getSchemaMode(spec);
+    const dimensionMode = getDimensionMode(spec);
 
     let mainFill: JSX.Element | string;
     if (schemaQueryState.isInit()) {
@@ -2353,7 +2349,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
       <>
         <div className="main">{mainFill}</div>
         <div className="control">
-          <SchemaMessage schemaMode={schemaMode} />
+          <SchemaMessage dimensionMode={dimensionMode} />
           {!somethingSelected && (
             <>
               <FormGroupWithInfo
@@ -2379,16 +2375,16 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
                 }
               >
                 <Switch
-                  checked={schemaMode === 'fixed'}
+                  checked={dimensionMode === 'specific'}
                   onChange={() =>
                     this.setState({
-                      newSchemaMode: schemaMode === 'fixed' ? 'string-only-discovery' : 'fixed',
+                      newDimensionMode: dimensionMode === 'specific' ? 'auto-detect' : 'specific',
                     })
                   }
-                  label="Explicitly specify schema"
+                  label="Explicitly specify dimension list"
                 />
               </FormGroupWithInfo>
-              {schemaMode !== 'fixed' && (
+              {dimensionMode === 'auto-detect' && (
                 <AutoForm
                   fields={[
                     {
@@ -2474,7 +2470,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
               <FormGroup>
                 <Button
                   text="Add dimension"
-                  disabled={schemaMode !== 'fixed'}
+                  disabled={dimensionMode !== 'specific'}
                   onClick={() => {
                     this.setState({
                       selectedDimensionSpec: {
@@ -2610,7 +2606,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
         action={async () => {
           const sampleResponse = await sampleForTransform(spec, cacheRows);
           this.updateSpec(
-            updateSchemaWithSample(spec, sampleResponse, getSchemaMode(spec), newRollup, true),
+            updateSchemaWithSample(spec, sampleResponse, getDimensionMode(spec), newRollup, true),
           );
         }}
         confirmButtonText={`Yes - ${newRollup ? 'enable' : 'disable'} rollup`}
@@ -2626,55 +2622,32 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
   }
 
   renderChangeDimensionModeAction() {
-    const { newSchemaMode, spec, cacheRows } = this.state;
-    if (!newSchemaMode || !cacheRows) return;
-    const autoDetect = newSchemaMode !== 'fixed';
+    const { newDimensionMode, spec, cacheRows } = this.state;
+    if (typeof newDimensionMode === 'undefined' || !cacheRows) return;
+    const autoDetect = newDimensionMode === 'auto-detect';
 
     return (
       <AsyncActionDialog
         action={async () => {
           const sampleResponse = await sampleForTransform(spec, cacheRows);
           this.updateSpec(
-            updateSchemaWithSample(spec, sampleResponse, newSchemaMode, getRollup(spec)),
+            updateSchemaWithSample(spec, sampleResponse, newDimensionMode, getRollup(spec)),
           );
         }}
-        confirmButtonText={`Yes - ${autoDetect ? 'auto detect' : 'explicitly define'} schema`}
-        successText={`Schema mode changed to ${autoDetect ? 'auto detect' : 'explicitly defined'}.`}
-        failText="Could not change schema mode"
+        confirmButtonText={`Yes - ${autoDetect ? 'auto detect' : 'explicitly set'} columns`}
+        successText={`Dimension mode changes to ${
+          autoDetect ? 'auto detect' : 'specific list'
+        }. Schema has been updated.`}
+        failText="Could change dimension mode"
         intent={Intent.WARNING}
-        onClose={() => this.setState({ newSchemaMode: undefined })}
+        onClose={() => this.setState({ newDimensionMode: undefined })}
       >
         <p>
           {autoDetect
-            ? `Are you sure you want Druid to auto detect the data schema?`
-            : `Are you sure you want to explicitly specify a schema?`}
+            ? `Are you sure you don't want to explicitly specify a dimension list?`
+            : `Are you sure you want to explicitly specify a dimension list?`}
         </p>
-        <p>Making this change will reset all schema configuration done so far.</p>
-        {autoDetect && (
-          <Switch
-            checked={newSchemaMode === 'type-aware-discovery'}
-            onChange={() => {
-              this.setState({
-                newSchemaMode:
-                  newSchemaMode === 'string-only-discovery'
-                    ? 'type-aware-discovery'
-                    : 'string-only-discovery',
-              });
-            }}
-          >
-            Use the new type-aware schema discovery capability. Avoid this if you are appending to a
-            datasource created with string-only schema discovery of Druid and want to preserve
-            schema compatibility. For more information see the{' '}
-            <ExternalLink
-              href={`${getLink(
-                'DOCS',
-              )}/ingestion/schema-design.html#schema-auto-discovery-for-dimensions`}
-            >
-              documentation
-            </ExternalLink>
-            .
-          </Switch>
-        )}
+        <p>Making this change will reset any work you have done in this section.</p>
       </AsyncActionDialog>
     );
   }
@@ -2715,7 +2688,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
   renderDimensionSpecControls() {
     const { spec, selectedDimensionSpec } = this.state;
     if (!selectedDimensionSpec) return;
-    const schemaMode = getSchemaMode(spec);
+    const dimensionMode = getDimensionMode(spec);
 
     const dimensions = deepGet(spec, `spec.dataSchema.dimensionsSpec.dimensions`) || EMPTY_ARRAY;
 
@@ -2736,7 +2709,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
 
     const convertToMetric = (type: string, prefix: string) => {
       const specWithoutDimension =
-        schemaMode === 'fixed'
+        dimensionMode === 'specific'
           ? deepDelete(
               spec,
               `spec.dataSchema.dimensionsSpec.dimensions.${selectedDimensionSpec.index}`,
@@ -2838,7 +2811,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
   renderMetricSpecControls() {
     const { spec, selectedMetricSpec } = this.state;
     if (!selectedMetricSpec) return;
-    const schemaMode = getSchemaMode(spec);
+    const dimensionMode = getDimensionMode(spec);
     const selectedMetricSpecFieldName = selectedMetricSpec.value.fieldName;
 
     const convertToDimension = (type: string) => {
@@ -2889,7 +2862,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
         }
       >
         {selectedMetricSpec.index !== -1 &&
-          schemaMode === 'fixed' &&
+          dimensionMode === 'specific' &&
           selectedMetricSpecFieldName && (
             <FormGroup>
               <Popover2 content={convertToDimensionMenu}>
@@ -3269,24 +3242,9 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
     }
   };
 
-  async queryForSpec() {
-    let existingDatasources: string[];
-    try {
-      existingDatasources = (await Api.instance.get<string[]>('/druid/coordinator/v1/datasources'))
-        .data;
-    } catch {
-      return;
-    }
-
-    this.setState({
-      existingDatasources,
-    });
-  }
-
   renderSpecStep() {
-    const { spec, existingDatasources, submitting } = this.state;
+    const { spec, submitting } = this.state;
     const issueWithSpec = getIssueWithSpec(spec);
-    const datasource = deepGet(spec, 'spec.dataSchema.dataSource');
 
     return (
       <>
@@ -3309,34 +3267,6 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
               >{`There is an issue with the spec: ${issueWithSpec}`}</Callout>
             </FormGroup>
           )}
-          {getSchemaMode(spec) === 'type-aware-discovery' &&
-            existingDatasources?.includes(datasource) && (
-              <FormGroup>
-                <Callout intent={Intent.WARNING}>
-                  <p>
-                    You have enabled type-aware schema discovery (
-                    <Code>useSchemaDiscovery: true</Code>) to ingest data into the existing
-                    datasource <Code>{datasource}</Code>.
-                  </p>
-                  <p>
-                    If you used string-based schema discovery when first ingesting data to{' '}
-                    <Code>{datasource}</Code>, using type-aware schema discovery now can cause
-                    problems with the values multi-value string dimensions.
-                  </p>
-                  <p>
-                    For more information see the{' '}
-                    <ExternalLink
-                      href={`${getLink(
-                        'DOCS',
-                      )}/ingestion/schema-design.html#schema-auto-discovery-for-dimensions`}
-                    >
-                      documentation
-                    </ExternalLink>
-                    .
-                  </p>
-                </Callout>
-              </FormGroup>
-            )}
           <AppendToExistingIssue spec={spec} onChangeSpec={this.updateSpec} />
         </div>
         <div className="next-bar">
@@ -3349,7 +3279,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
             />
           )}
           <Button
-            text={submitting ? 'Submitting...' : 'Submit'}
+            text="Submit"
             rightIcon={IconNames.CLOUD_UPLOAD}
             intent={Intent.PRIMARY}
             disabled={submitting || Boolean(issueWithSpec)}

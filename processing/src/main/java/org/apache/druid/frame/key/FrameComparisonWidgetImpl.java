@@ -138,10 +138,10 @@ public class FrameComparisonWidgetImpl implements FrameComparisonWidget
   }
 
   @Override
-  public boolean isCompletelyNonNullKey(int row)
+  public boolean isPartiallyNullKey(int row)
   {
     if (keyFieldCount == 0) {
-      return true;
+      return false;
     }
 
     final long rowPosition = getRowPositionInDataRegion(row);
@@ -150,13 +150,13 @@ public class FrameComparisonWidgetImpl implements FrameComparisonWidget
     for (int i = 0; i < keyFieldCount; i++) {
       final boolean isNull = keyFieldReaders.get(i).isNull(dataRegion, keyFieldPosition);
       if (isNull) {
-        return false;
+        return true;
       } else {
         keyFieldPosition = rowPosition + dataRegion.getInt(rowPosition + (long) i * Integer.BYTES);
       }
     }
 
-    return true;
+    return false;
   }
 
   @Override

@@ -162,8 +162,7 @@ public class ControllerQueryKernel
    */
   public List<StageId> createAndGetNewStageIds(
       final InputSpecSlicerFactory slicerFactory,
-      final WorkerAssignmentStrategy assignmentStrategy,
-      final long maxInputBytesPerWorker
+      final WorkerAssignmentStrategy assignmentStrategy
   )
   {
     final Int2IntMap stageWorkerCountMap = new Int2IntAVLTreeMap();
@@ -178,7 +177,7 @@ public class ControllerQueryKernel
       }
     }
 
-    createNewKernels(stageWorkerCountMap, slicerFactory.makeSlicer(stagePartitionsMap), assignmentStrategy, maxInputBytesPerWorker);
+    createNewKernels(stageWorkerCountMap, slicerFactory.makeSlicer(stagePartitionsMap), assignmentStrategy);
     return stageTracker.values()
                        .stream()
                        .filter(controllerStageTracker -> controllerStageTracker.getPhase() == ControllerStagePhase.NEW)
@@ -293,8 +292,7 @@ public class ControllerQueryKernel
   private void createNewKernels(
       final Int2IntMap stageWorkerCountMap,
       final InputSpecSlicer slicer,
-      final WorkerAssignmentStrategy assignmentStrategy,
-      final long maxInputBytesPerWorker
+      final WorkerAssignmentStrategy assignmentStrategy
   )
   {
     for (final StageId nextStage : readyToRunStages) {
@@ -305,8 +303,7 @@ public class ControllerQueryKernel
           stageWorkerCountMap,
           slicer,
           assignmentStrategy,
-          maxRetainedPartitionSketchBytes,
-          maxInputBytesPerWorker
+          maxRetainedPartitionSketchBytes
       );
       stageTracker.put(nextStage, stageKernel);
     }

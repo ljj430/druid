@@ -47,14 +47,13 @@ public class ParseExceptionReport
   {
     List<LinkedHashMap<String, Object>> events =
         (List<LinkedHashMap<String, Object>>) reportData.getUnparseableEvents().get(phase);
+
     final List<String> inputs = new ArrayList<>();
     final List<String> errorMessages = new ArrayList<>();
-    if (events != null) {
-      events.forEach(event -> {
-        inputs.add((String) event.get("input"));
-        errorMessages.add(((List<String>) event.get("details")).get(0));
-      });
-    }
+    events.forEach(event -> {
+      inputs.add((String) event.get("input"));
+      errorMessages.add(((List<String>) event.get("details")).get(0));
+    });
 
     return new ParseExceptionReport(inputs, errorMessages);
   }

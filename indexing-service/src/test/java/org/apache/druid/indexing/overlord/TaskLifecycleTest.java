@@ -59,6 +59,7 @@ import org.apache.druid.indexer.TaskStatus;
 import org.apache.druid.indexing.common.SegmentCacheManagerFactory;
 import org.apache.druid.indexing.common.TaskLock;
 import org.apache.druid.indexing.common.TaskLockType;
+import org.apache.druid.indexing.common.TaskStorageDirTracker;
 import org.apache.druid.indexing.common.TaskToolbox;
 import org.apache.druid.indexing.common.TaskToolboxFactory;
 import org.apache.druid.indexing.common.TestUtils;
@@ -70,7 +71,6 @@ import org.apache.druid.indexing.common.actions.TaskActionToolbox;
 import org.apache.druid.indexing.common.actions.TaskAuditLogConfig;
 import org.apache.druid.indexing.common.actions.TimeChunkLockTryAcquireAction;
 import org.apache.druid.indexing.common.config.TaskConfig;
-import org.apache.druid.indexing.common.config.TaskConfigBuilder;
 import org.apache.druid.indexing.common.config.TaskStorageConfig;
 import org.apache.druid.indexing.common.task.AbstractFixedIntervalTask;
 import org.apache.druid.indexing.common.task.IndexTask;
@@ -415,7 +415,7 @@ public class TaskLifecycleTest extends InitializedNullHandlingTest
     // initialize variables
     announcedSinks = 0;
     pushedSegments = 0;
-    indexSpec = IndexSpec.DEFAULT;
+    indexSpec = new IndexSpec();
     emitter = newMockEmitter();
     EmittingLogger.registerEmitter(emitter);
     mapper = TEST_UTILS.getTestObjectMapper();
@@ -607,12 +607,28 @@ public class TaskLifecycleTest extends InitializedNullHandlingTest
         ),
         new TaskAuditLogConfig(true)
     );
-    taskConfig = new TaskConfigBuilder()
-        .setBaseDir(temporaryFolder.newFolder().toString())
-        .setDefaultRowFlushBoundary(50000)
-        .setBatchProcessingMode(TaskConfig.BATCH_PROCESSING_MODE_DEFAULT.name())
-        .setTmpStorageBytesPerTask(-1L)
-        .build();
+    final String taskDirA = temporaryFolder.newFolder().toString();
+    final String taskDirB = temporaryFolder.newFolder().toString();
+    taskConfig = new TaskConfig(
+        null,
+        null,
+        null,
+        50000,
+        null,
+        false,
+        null,
+        null,
+        null,
+        false,
+        false,
+        TaskConfig.BATCH_PROCESSING_MODE_DEFAULT.name(),
+        null,
+        false,
+        ImmutableList.of(
+            taskDirA,
+            taskDirB
+        )
+    );
 
     return new TaskToolboxFactory(
         taskConfig,
@@ -697,7 +713,8 @@ public class TaskLifecycleTest extends InitializedNullHandlingTest
         null,
         null,
         null,
-        "1"
+        "1",
+        new TaskStorageDirTracker(taskConfig)
     );
   }
 

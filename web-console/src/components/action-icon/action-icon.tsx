@@ -27,17 +27,10 @@ export interface ActionIconProps {
   className?: string;
   icon: IconName;
   onClick?: () => void;
-  disabled?: boolean;
 }
 
 export const ActionIcon = React.memo(function ActionIcon(props: ActionIconProps) {
-  const { className, icon, onClick, disabled } = props;
+  const { className, icon, onClick } = props;
 
-  return (
-    <Icon
-      className={classNames('action-icon', className, { disabled })}
-      icon={icon}
-      onClick={onClick}
-    />
-  );
+  return <Icon className={classNames('action-icon', className)} icon={icon} onClick={onClick} />;
 });

@@ -51,7 +51,6 @@ import org.apache.druid.query.aggregation.hyperloglog.HyperUniquesAggregatorFact
 import org.apache.druid.query.lookup.LookupExtractorFactoryContainerProvider;
 import org.apache.druid.segment.IndexBuilder;
 import org.apache.druid.segment.QueryableIndex;
-import org.apache.druid.segment.SegmentWrangler;
 import org.apache.druid.segment.column.ColumnType;
 import org.apache.druid.segment.column.RowSignature;
 import org.apache.druid.segment.incremental.IncrementalIndexSchema;
@@ -777,7 +776,7 @@ public class TestDataBuilder
 
     return new SpecificSegmentsQuerySegmentWalker(
         conglomerate,
-        injector.getInstance(SegmentWrangler.class),
+        injector.getInstance(LookupExtractorFactoryContainerProvider.class),
         joinableFactoryWrapper,
         scheduler
     ).add(

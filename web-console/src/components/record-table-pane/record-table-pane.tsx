@@ -30,7 +30,6 @@ import { SMALL_TABLE_PAGE_SIZE, SMALL_TABLE_PAGE_SIZE_OPTIONS } from '../../reac
 import type { Pagination } from '../../utils';
 import {
   columnToIcon,
-  columnToSummary,
   columnToWidth,
   filterMap,
   formatNumber,
@@ -141,7 +140,7 @@ export const RecordTablePane = React.memo(function RecordTablePane(props: Record
               Header() {
                 return (
                   <div className="clickable-cell">
-                    <div className="output-name" title={columnToSummary(column)}>
+                    <div className="output-name">
                       {icon && <Icon className="type-icon" icon={icon} size={12} />}
                       {h}
                       {hasFilterOnHeader(h, i) && <Icon icon={IconNames.FILTER} size={14} />}

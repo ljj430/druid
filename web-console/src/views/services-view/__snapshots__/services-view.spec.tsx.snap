@@ -58,7 +58,6 @@ exports[`ServicesView renders data 1`] = `
           "Current size",
           "Max size",
           "Usage",
-          "Start time",
           "Detail",
           "Actions",
         ]
@@ -200,14 +199,6 @@ exports[`ServicesView renders data 1`] = `
         Object {
           "Aggregated": [Function],
           "Cell": [Function],
-          "Header": "Start time",
-          "accessor": "start_time",
-          "show": true,
-          "width": 200,
-        },
-        Object {
-          "Aggregated": [Function],
-          "Cell": [Function],
           "Header": "Detail",
           "accessor": [Function],
           "className": "padded",
@@ -239,7 +230,6 @@ exports[`ServicesView renders data 1`] = `
             "plaintext_port": 8082,
             "service": "localhost:8082",
             "service_type": "broker",
-            "start_time": 0,
             "tier": null,
             "tls_port": -1,
           },
@@ -255,7 +245,6 @@ exports[`ServicesView renders data 1`] = `
             "segmentsToLoadSize": 0,
             "service": "localhost:8083",
             "service_type": "historical",
-            "start_time": 0,
             "tier": "_default_tier",
             "tls_port": -1,
           },

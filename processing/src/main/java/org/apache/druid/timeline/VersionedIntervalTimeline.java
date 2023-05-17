@@ -35,7 +35,6 @@ import org.joda.time.Interval;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -723,10 +722,6 @@ public class VersionedIntervalTimeline<VersionType, ObjectType extends Overshado
   @GuardedBy("lock")
   private List<TimelineObjectHolder<VersionType, ObjectType>> lookup(Interval interval, Partitions completeness)
   {
-    if (interval.getStartMillis() == interval.getEndMillis()) {
-      return Collections.emptyList();
-    }
-
     List<TimelineObjectHolder<VersionType, ObjectType>> retVal = new ArrayList<>();
     NavigableMap<Interval, TimelineEntry> timeline;
     if (completeness == Partitions.INCOMPLETE_OK) {

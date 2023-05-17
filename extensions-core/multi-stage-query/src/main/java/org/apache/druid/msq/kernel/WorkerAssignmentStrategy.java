@@ -45,11 +45,10 @@ public enum WorkerAssignmentStrategy
   MAX {
     @Override
     public List<InputSlice> assign(
-        final StageDefinition stageDef,
-        final InputSpec inputSpec,
-        final Int2IntMap stageWorkerCountMap,
-        final InputSpecSlicer slicer,
-        final long maxInputBytesPerSlice
+        StageDefinition stageDef,
+        InputSpec inputSpec,
+        Int2IntMap stageWorkerCountMap,
+        InputSpecSlicer slicer
     )
     {
       return slicer.sliceStatic(inputSpec, stageDef.getMaxWorkerCount());
@@ -58,7 +57,7 @@ public enum WorkerAssignmentStrategy
 
   /**
    * Use the lowest possible number of tasks, while keeping each task's workload under
-   * {@link Limits#MAX_INPUT_FILES_PER_WORKER} files and {@code maxInputBytesPerWorker} bytes.
+   * {@link Limits#MAX_INPUT_FILES_PER_WORKER} files and {@link StageDefinition#getMaxInputBytesPerWorker()} bytes.
    *
    * Implemented using {@link InputSpecSlicer#sliceDynamic} whenever possible.
    */
@@ -68,8 +67,7 @@ public enum WorkerAssignmentStrategy
         final StageDefinition stageDef,
         final InputSpec inputSpec,
         final Int2IntMap stageWorkerCountMap,
-        final InputSpecSlicer slicer,
-        final long maxInputBytesPerSlice
+        final InputSpecSlicer slicer
     )
     {
       if (slicer.canSliceDynamic(inputSpec)) {
@@ -77,7 +75,7 @@ public enum WorkerAssignmentStrategy
             inputSpec,
             stageDef.getMaxWorkerCount(),
             Limits.MAX_INPUT_FILES_PER_WORKER,
-            maxInputBytesPerSlice
+            stageDef.getMaxInputBytesPerWorker()
         );
       } else {
         // In auto mode, if we can't slice inputs dynamically, we instead carry forwards the number of workers from
@@ -112,19 +110,10 @@ public enum WorkerAssignmentStrategy
     return StringUtils.toLowerCase(name());
   }
 
-  /**
-   * @param stageDef current stage definition. Contains information on max workers, input stage numbers
-   * @param inputSpec inputSpec containing information on where the input is read from
-   * @param stageWorkerCountMap map of past stage number vs number of worker inputs
-   * @param slicer creates slices of input spec based on other parameters
-   * @param maxInputBytesPerSlice maximum suggested bytes per input slice
-   * @return list containing input slices
-   */
   public abstract List<InputSlice> assign(
       StageDefinition stageDef,
       InputSpec inputSpec,
       Int2IntMap stageWorkerCountMap,
-      InputSpecSlicer slicer,
-      long maxInputBytesPerSlice
+      InputSpecSlicer slicer
   );
 }

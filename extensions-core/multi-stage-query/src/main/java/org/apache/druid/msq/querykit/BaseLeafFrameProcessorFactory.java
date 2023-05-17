@@ -31,6 +31,8 @@ import org.apache.druid.frame.processor.OutputChannel;
 import org.apache.druid.frame.processor.OutputChannelFactory;
 import org.apache.druid.frame.processor.OutputChannels;
 import org.apache.druid.frame.write.FrameWriterFactory;
+import org.apache.druid.java.util.common.ISE;
+import org.apache.druid.java.util.common.Pair;
 import org.apache.druid.java.util.common.guava.Sequence;
 import org.apache.druid.java.util.common.guava.Sequences;
 import org.apache.druid.java.util.common.logger.Logger;
@@ -74,7 +76,7 @@ public abstract class BaseLeafFrameProcessorFactory extends BaseFrameProcessorFa
   ) throws IOException
   {
     // BaseLeafFrameProcessorFactory is used for native Druid queries, where the following input cases can happen:
-    //   1) Union datasources: N nonbroadcast inputs, which are treated as one big input
+    //   1) Union datasources: N nonbroadcast inputs, which are are treated as one big input
     //   2) Join datasources: one nonbroadcast input, N broadcast inputs
     //   3) All other datasources: single input
 
@@ -126,16 +128,10 @@ public abstract class BaseLeafFrameProcessorFactory extends BaseFrameProcessorFa
 
     final Sequence<FrameProcessor<Long>> processors = processorBaseInputs.map(
         processorBaseInput -> {
-          // Read broadcast data from earlier stages. Note that for each processor, we are rebuilding the broadcast
-          // table from scratch, which is wasteful. This could be pushed up a level.
+          // For each processor, we are rebuilding the broadcast table again which is wasteful. This can be pushed
+          // up to the factory level
           final Int2ObjectMap<ReadableInput> sideChannels =
-              readBroadcastInputsFromEarlierStages(
-                  stageDefinition,
-                  inputSlices,
-                  inputSliceReader,
-                  counters,
-                  warningPublisher
-              );
+              readBroadcastInputs(stageDefinition, inputSlices, inputSliceReader, counters, warningPublisher);
 
           return makeProcessor(
               processorBaseInput,
@@ -205,12 +201,12 @@ public abstract class BaseLeafFrameProcessorFactory extends BaseFrameProcessorFa
   }
 
   /**
-   * Reads all broadcast inputs of type {@link StageInputSlice}. Returns a map of input number -> channel containing
-   * all data for that input number.
+   * Reads all broadcast inputs, which must be {@link StageInputSlice}. The execution framework supports broadcasting
+   * other types of inputs, but QueryKit does not use them at this time.
    *
-   * Broadcast inputs that are not type {@link StageInputSlice} are ignored.
+   * Returns a map of input number -> channel containing all data for that input number.
    */
-  private static Int2ObjectMap<ReadableInput> readBroadcastInputsFromEarlierStages(
+  private static Int2ObjectMap<ReadableInput> readBroadcastInputs(
       final StageDefinition stageDef,
       final List<InputSlice> inputSlices,
       final InputSliceReader inputSliceReader,
@@ -222,13 +218,17 @@ public abstract class BaseLeafFrameProcessorFactory extends BaseFrameProcessorFa
 
     try {
       for (int inputNumber = 0; inputNumber < inputSlices.size(); inputNumber++) {
-        if (stageDef.getBroadcastInputNumbers().contains(inputNumber)
-            && inputSlices.get(inputNumber) instanceof StageInputSlice) {
+        if (stageDef.getBroadcastInputNumbers().contains(inputNumber)) {
+          // QueryKit only uses StageInputSlice at this time.
           final StageInputSlice slice = (StageInputSlice) inputSlices.get(inputNumber);
           final ReadableInputs readableInputs =
               inputSliceReader.attach(inputNumber, slice, counterTracker, warningPublisher);
 
-          // We know ReadableInput::getChannel is OK, because StageInputSlice always uses channels (never segments).
+          if (!readableInputs.isChannelBased()) {
+            // QueryKit limitation: broadcast inputs must be channels.
+            throw new ISE("Broadcast inputs must be channels");
+          }
+
           final ReadableFrameChannel channel = ReadableConcatFrameChannel.open(
               Iterators.transform(readableInputs.iterator(), ReadableInput::getChannel)
           );
@@ -254,7 +254,7 @@ public abstract class BaseLeafFrameProcessorFactory extends BaseFrameProcessorFa
   protected abstract FrameProcessor<Long> makeProcessor(
       ReadableInput baseInput,
       Int2ObjectMap<ReadableInput> sideChannels,
-      ResourceHolder<WritableFrameChannel> outputChannel,
+      ResourceHolder<WritableFrameChannel> outputChannelSupplier,
       ResourceHolder<FrameWriterFactory> frameWriterFactory,
       FrameContext providerThingy
   );
@@ -272,29 +272,21 @@ public abstract class BaseLeafFrameProcessorFactory extends BaseFrameProcessorFa
             resource = queueRef.get().poll();
           }
 
-          return new ResourceHolder<T>()
-          {
-            @Override
-            public T get()
-            {
-              return resource;
-            }
-
-            @Override
-            public void close()
-            {
-              synchronized (queueRef) {
-                final Queue<T> queue = queueRef.get();
-                if (queue != null) {
-                  queue.add(resource);
-                  return;
+          return Pair.of(
+              resource,
+              () -> {
+                synchronized (queueRef) {
+                  final Queue<T> queue = queueRef.get();
+                  if (queue != null) {
+                    queue.add(resource);
+                    return;
+                  }
                 }
-              }
 
-              // Queue was null
-              backupCloser.accept(resource);
-            }
-          };
+                // Queue was null
+                backupCloser.accept(resource);
+              }
+          );
         }
     );
   }

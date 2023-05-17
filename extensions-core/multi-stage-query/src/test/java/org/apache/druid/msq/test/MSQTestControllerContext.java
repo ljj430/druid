@@ -43,10 +43,7 @@ import org.apache.druid.msq.exec.WorkerClient;
 import org.apache.druid.msq.exec.WorkerImpl;
 import org.apache.druid.msq.exec.WorkerManagerClient;
 import org.apache.druid.msq.exec.WorkerMemoryParameters;
-import org.apache.druid.msq.exec.WorkerStorageParameters;
 import org.apache.druid.msq.indexing.MSQWorkerTask;
-import org.apache.druid.msq.util.MultiStageQueryContext;
-import org.apache.druid.query.QueryContext;
 import org.apache.druid.server.DruidNode;
 import org.apache.druid.sql.calcite.util.SpecificSegmentsQuerySegmentWalker;
 import org.mockito.ArgumentMatchers;
@@ -63,12 +60,10 @@ import java.util.stream.Collectors;
 public class MSQTestControllerContext implements ControllerContext
 {
   private static final Logger log = new Logger(MSQTestControllerContext.class);
-  private static final int NUM_WORKERS = 4;
   private final TaskActionClient taskActionClient;
   private final Map<String, Worker> inMemoryWorkers = new HashMap<>();
   private final ConcurrentMap<String, TaskStatus> statusMap = new ConcurrentHashMap<>();
-  private final ListeningExecutorService executor = MoreExecutors.listeningDecorator(Execs.multiThreaded(
-      NUM_WORKERS,
+  private final ListeningExecutorService executor = MoreExecutors.listeningDecorator(Execs.singleThreaded(
       "MultiStageQuery-test-controller-client"));
   private final CoordinatorClient coordinatorClient;
   private final DruidNode node = new DruidNode(
@@ -121,19 +116,9 @@ public class MSQTestControllerContext implements ControllerContext
       if (controller == null) {
         throw new ISE("Controller needs to be set using the register method");
       }
-
-      WorkerStorageParameters workerStorageParameters;
-      // If we are testing durable storage, set a low limit on storage so that the durable storage will be used.
-      if (MultiStageQueryContext.isDurableStorageEnabled(QueryContext.of(task.getContext()))) {
-        workerStorageParameters = WorkerStorageParameters.createInstanceForTests(100);
-      } else {
-        workerStorageParameters = WorkerStorageParameters.createInstanceForTests(Long.MAX_VALUE);
-      }
-
       Worker worker = new WorkerImpl(
           task,
-          new MSQTestWorkerContext(inMemoryWorkers, controller, mapper, injector, workerMemoryParameters),
-          workerStorageParameters
+          new MSQTestWorkerContext(inMemoryWorkers, controller, mapper, injector, workerMemoryParameters)
       );
       inMemoryWorkers.put(task.getId(), worker);
       statusMap.put(task.getId(), TaskStatus.running(task.getId()));

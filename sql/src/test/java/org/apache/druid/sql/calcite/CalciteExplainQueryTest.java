@@ -48,19 +48,17 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
                                + "\"granularity\":{\"type\":\"all\"},"
                                + "\"aggregations\":[{\"type\":\"count\",\"name\":\"a0\"}],"
                                + "\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"}},"
-                               + "\"signature\":[{\"name\":\"a0\",\"type\":\"LONG\"}],"
-                               + "\"columnMappings\":[{\"queryColumn\":\"a0\",\"outputColumn\":\"EXPR$0\"}]"
+                               + "\"signature\":[{\"name\":\"a0\",\"type\":\"LONG\"}]"
                                + "}]";
     final String resources = "[{\"name\":\"aview\",\"type\":\"VIEW\"}]";
-    final String attributes = "{\"statementType\":\"SELECT\",\"targetDataSource\":null}";
 
     testQuery(
-        PLANNER_CONFIG_LEGACY_QUERY_EXPLAIN,
+        PlannerConfig.builder().useNativeQueryExplain(false).build(),
         query,
         CalciteTests.REGULAR_USER_AUTH_RESULT,
         ImmutableList.of(),
         ImmutableList.of(
-            new Object[]{legacyExplanation, resources, attributes}
+            new Object[]{legacyExplanation, resources}
         )
     );
     testQuery(
@@ -69,7 +67,7 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
         CalciteTests.REGULAR_USER_AUTH_RESULT,
         ImmutableList.of(),
         ImmutableList.of(
-            new Object[]{explanation, resources, attributes}
+            new Object[]{explanation, resources}
         )
     );
   }
@@ -83,7 +81,6 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
         + "    BindableTableScan(table=[[INFORMATION_SCHEMA, COLUMNS]])\n";
 
     final String resources = "[]";
-    final String attributes = "{\"statementType\":\"SELECT\",\"targetDataSource\":null}";
 
     testQuery(
         "EXPLAIN PLAN FOR\n"
@@ -92,7 +89,7 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
         + "WHERE TABLE_SCHEMA = 'druid' AND TABLE_NAME = 'foo'",
         ImmutableList.of(),
         ImmutableList.of(
-            new Object[]{explanation, resources, attributes}
+            new Object[]{explanation, resources}
         )
     );
   }
@@ -125,28 +122,26 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
                                + "\"aggregations\":[{\"type\":\"count\",\"name\":\"a0\"}],"
                                + "\"limitSpec\":{\"type\":\"NoopLimitSpec\"},"
                                + "\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"}},"
-                               + "\"signature\":[{\"name\":\"a0\",\"type\":\"LONG\"}],"
-                               + "\"columnMappings\":[{\"queryColumn\":\"a0\",\"outputColumn\":\"EXPR$0\"}]"
+                               + "\"signature\":[{\"name\":\"a0\",\"type\":\"LONG\"}]"
                                + "}]";
     final String resources = "[{\"name\":\"foo\",\"type\":\"DATASOURCE\"}]";
-    final String attributes = "{\"statementType\":\"SELECT\",\"targetDataSource\":null}";
 
     testQuery(
         query,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{explanation, resources, attributes})
+        ImmutableList.of(new Object[]{explanation, resources})
     );
 
     testQuery(
-        PLANNER_CONFIG_LEGACY_QUERY_EXPLAIN,
+        PlannerConfig.builder().useNativeQueryExplain(false).build(),
         query,
         CalciteTests.REGULAR_USER_AUTH_RESULT,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{legacyExplanation, resources, attributes})
+        ImmutableList.of(new Object[]{legacyExplanation, resources})
     );
   }
 
-  // This testcase has been added here and not in CalciteSelectQueryTest since this checks if the overrides are working
+  // This testcase has been added here and not in CalciteSelectQueryTests since this checks if the overrides are working
   // properly when displaying the output of "EXPLAIN PLAN FOR ..." queries
   @Test
   public void testExplainSelectStarWithOverrides()
@@ -170,8 +165,7 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
                          + "\"legacy\":false,"
                          + "\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},"
                          + "\"granularity\":{\"type\":\"all\"}},"
-                         + "\"signature\":[{\"name\":\"__time\",\"type\":\"LONG\"},{\"name\":\"dim1\",\"type\":\"STRING\"},{\"name\":\"dim2\",\"type\":\"STRING\"},{\"name\":\"dim3\",\"type\":\"STRING\"},{\"name\":\"cnt\",\"type\":\"LONG\"},{\"name\":\"m1\",\"type\":\"FLOAT\"},{\"name\":\"m2\",\"type\":\"DOUBLE\"},{\"name\":\"unique_dim1\",\"type\":\"COMPLEX<hyperUnique>\"}],"
-                         + "\"columnMappings\":[{\"queryColumn\":\"__time\",\"outputColumn\":\"__time\"},{\"queryColumn\":\"dim1\",\"outputColumn\":\"dim1\"},{\"queryColumn\":\"dim2\",\"outputColumn\":\"dim2\"},{\"queryColumn\":\"dim3\",\"outputColumn\":\"dim3\"},{\"queryColumn\":\"cnt\",\"outputColumn\":\"cnt\"},{\"queryColumn\":\"m1\",\"outputColumn\":\"m1\"},{\"queryColumn\":\"m2\",\"outputColumn\":\"m2\"},{\"queryColumn\":\"unique_dim1\",\"outputColumn\":\"unique_dim1\"}]"
+                         + "\"signature\":[{\"name\":\"__time\",\"type\":\"LONG\"},{\"name\":\"dim1\",\"type\":\"STRING\"},{\"name\":\"dim2\",\"type\":\"STRING\"},{\"name\":\"dim3\",\"type\":\"STRING\"},{\"name\":\"cnt\",\"type\":\"LONG\"},{\"name\":\"m1\",\"type\":\"FLOAT\"},{\"name\":\"m2\",\"type\":\"DOUBLE\"},{\"name\":\"unique_dim1\",\"type\":\"COMPLEX<hyperUnique>\"}]"
                          + "}]";
 
     String explanationWithContext = "[{"
@@ -183,22 +177,20 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
                                     + "\"legacy\":false,"
                                     + "\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"useNativeQueryExplain\":true,\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},"
                                     + "\"granularity\":{\"type\":\"all\"}},"
-                                    + "\"signature\":[{\"name\":\"__time\",\"type\":\"LONG\"},{\"name\":\"dim1\",\"type\":\"STRING\"},{\"name\":\"dim2\",\"type\":\"STRING\"},{\"name\":\"dim3\",\"type\":\"STRING\"},{\"name\":\"cnt\",\"type\":\"LONG\"},{\"name\":\"m1\",\"type\":\"FLOAT\"},{\"name\":\"m2\",\"type\":\"DOUBLE\"},{\"name\":\"unique_dim1\",\"type\":\"COMPLEX<hyperUnique>\"}],"
-                                    + "\"columnMappings\":[{\"queryColumn\":\"__time\",\"outputColumn\":\"__time\"},{\"queryColumn\":\"dim1\",\"outputColumn\":\"dim1\"},{\"queryColumn\":\"dim2\",\"outputColumn\":\"dim2\"},{\"queryColumn\":\"dim3\",\"outputColumn\":\"dim3\"},{\"queryColumn\":\"cnt\",\"outputColumn\":\"cnt\"},{\"queryColumn\":\"m1\",\"outputColumn\":\"m1\"},{\"queryColumn\":\"m2\",\"outputColumn\":\"m2\"},{\"queryColumn\":\"unique_dim1\",\"outputColumn\":\"unique_dim1\"}]"
+                                    + "\"signature\":[{\"name\":\"__time\",\"type\":\"LONG\"},{\"name\":\"dim1\",\"type\":\"STRING\"},{\"name\":\"dim2\",\"type\":\"STRING\"},{\"name\":\"dim3\",\"type\":\"STRING\"},{\"name\":\"cnt\",\"type\":\"LONG\"},{\"name\":\"m1\",\"type\":\"FLOAT\"},{\"name\":\"m2\",\"type\":\"DOUBLE\"},{\"name\":\"unique_dim1\",\"type\":\"COMPLEX<hyperUnique>\"}]"
                                     + "}]";
     String sql = "EXPLAIN PLAN FOR SELECT * FROM druid.foo";
     String resources = "[{\"name\":\"foo\",\"type\":\"DATASOURCE\"}]";
-    final String attributes = "{\"statementType\":\"SELECT\",\"targetDataSource\":null}";
 
     // Test when default config and no overrides
-    testQuery(sql, ImmutableList.of(), ImmutableList.of(new Object[]{explanation, resources, attributes}));
+    testQuery(sql, ImmutableList.of(), ImmutableList.of(new Object[]{explanation, resources}));
 
     // Test when default config and useNativeQueryExplain is overridden in the context
     testQuery(
         sql,
         legacyExplainContext,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{legacyExplanationWithContext, resources, attributes})
+        ImmutableList.of(new Object[]{legacyExplanationWithContext, resources})
     );
 
     // Test when useNativeQueryExplain enabled by default and no overrides
@@ -207,7 +199,7 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
         sql,
         CalciteTests.REGULAR_USER_AUTH_RESULT,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{explanation, resources, attributes})
+        ImmutableList.of(new Object[]{explanation, resources})
     );
 
     // Test when useNativeQueryExplain enabled by default but is overriden in the context
@@ -217,7 +209,7 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
         sql,
         CalciteTests.REGULAR_USER_AUTH_RESULT,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{explanationWithContext, resources, attributes})
+        ImmutableList.of(new Object[]{explanationWithContext, resources})
     );
   }
 
@@ -238,28 +230,25 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
     final String explanation = "["
                                + "{"
                                + "\"query\":{\"queryType\":\"scan\",\"dataSource\":{\"type\":\"table\",\"name\":\"foo\"},\"intervals\":{\"type\":\"intervals\",\"intervals\":[\"-146136543-09-08T08:23:32.096Z/146140482-04-24T15:36:27.903Z\"]},\"resultFormat\":\"compactedList\",\"columns\":[\"dim1\"],\"legacy\":false,\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},\"granularity\":{\"type\":\"all\"}},"
-                               + "\"signature\":[{\"name\":\"dim1\",\"type\":\"STRING\"}],"
-                               + "\"columnMappings\":[{\"queryColumn\":\"dim1\",\"outputColumn\":\"dim1\"}]"
+                               + "\"signature\":[{\"name\":\"dim1\",\"type\":\"STRING\"}]"
                                + "},"
                                + "{"
                                + "\"query\":{\"queryType\":\"scan\",\"dataSource\":{\"type\":\"table\",\"name\":\"foo\"},\"intervals\":{\"type\":\"intervals\",\"intervals\":[\"-146136543-09-08T08:23:32.096Z/146140482-04-24T15:36:27.903Z\"]},\"resultFormat\":\"compactedList\",\"filter\":{\"type\":\"selector\",\"dimension\":\"dim1\",\"value\":\"42\"},\"columns\":[\"dim1\"],\"legacy\":false,\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},\"granularity\":{\"type\":\"all\"}},"
-                               + "\"signature\":[{\"name\":\"dim1\",\"type\":\"STRING\"}],"
-                               + "\"columnMappings\":[{\"queryColumn\":\"dim1\",\"outputColumn\":\"dim1\"}]"
+                               + "\"signature\":[{\"name\":\"dim1\",\"type\":\"STRING\"}]"
                                + "},"
                                + "{"
                                + "\"query\":{\"queryType\":\"scan\",\"dataSource\":{\"type\":\"table\",\"name\":\"foo\"},\"intervals\":{\"type\":\"intervals\",\"intervals\":[\"-146136543-09-08T08:23:32.096Z/146140482-04-24T15:36:27.903Z\"]},\"resultFormat\":\"compactedList\",\"filter\":{\"type\":\"selector\",\"dimension\":\"dim1\",\"value\":\"44\"},\"columns\":[\"dim1\"],\"legacy\":false,\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},\"granularity\":{\"type\":\"all\"}},"
-                               + "\"signature\":[{\"name\":\"dim1\",\"type\":\"STRING\"}],"
-                               + "\"columnMappings\":[{\"queryColumn\":\"dim1\",\"outputColumn\":\"dim1\"}]"
+                               + "\"signature\":[{\"name\":\"dim1\",\"type\":\"STRING\"}]"
                                + "}]";
     final String resources = "[{\"name\":\"foo\",\"type\":\"DATASOURCE\"}]";
-    final String attributes = "{\"statementType\":\"SELECT\",\"targetDataSource\":null}";
+
     testQuery(
-        PLANNER_CONFIG_LEGACY_QUERY_EXPLAIN,
+        PlannerConfig.builder().useNativeQueryExplain(false).build(),
         query,
         CalciteTests.REGULAR_USER_AUTH_RESULT,
         ImmutableList.of(),
         ImmutableList.of(
-            new Object[]{legacyExplanation, resources, attributes}
+            new Object[]{legacyExplanation, resources}
         )
     );
     testQuery(
@@ -268,7 +257,7 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
         CalciteTests.REGULAR_USER_AUTH_RESULT,
         ImmutableList.of(),
         ImmutableList.of(
-            new Object[]{explanation, resources, attributes}
+            new Object[]{explanation, resources}
         )
     );
   }
@@ -302,16 +291,15 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
                                                       + "\"legacy\":false,"
                                                       + "\"context\":{\"defaultTimeout\":300000,\"forceExpressionVirtualColumns\":true,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"useNativeQueryExplain\":true,\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},"
                                                       + "\"granularity\":{\"type\":\"all\"}},"
-                                                      + "\"signature\":[{\"name\":\"v0\",\"type\":\"STRING\"},{\"name\":\"v1\",\"type\":\"STRING\"}],"
-                                                      + "\"columnMappings\":[{\"queryColumn\":\"v0\",\"outputColumn\":\"EXPR$0\"},{\"queryColumn\":\"v1\",\"outputColumn\":\"EXPR$1\"}]"
+                                                      + "\"signature\":[{\"name\":\"v0\",\"type\":\"STRING\"},{\"name\":\"v1\",\"type\":\"STRING\"}]"
                                                       + "}]";
     final String expectedResources = "[{\"name\":\"foo\",\"type\":\"DATASOURCE\"}]";
-    final String expectedAttributes = "{\"statementType\":\"SELECT\",\"targetDataSource\":null}";
+
     testQuery(
         explainSql,
         defaultExprContext,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{expectedPlanWithDefaultExpressions, expectedResources, expectedAttributes})
+        ImmutableList.of(new Object[]{expectedPlanWithDefaultExpressions, expectedResources})
     );
 
     // Test plan as mv-filtered virtual columns
@@ -328,9 +316,9 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
                                               + "\"legacy\":false,"
                                               + "\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"useNativeQueryExplain\":true,\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},"
                                               + "\"granularity\":{\"type\":\"all\"}},"
-                                              + "\"signature\":[{\"name\":\"v0\",\"type\":\"STRING\"},{\"name\":\"v1\",\"type\":\"STRING\"}],"
-                                              + "\"columnMappings\":[{\"queryColumn\":\"v0\",\"outputColumn\":\"EXPR$0\"},{\"queryColumn\":\"v1\",\"outputColumn\":\"EXPR$1\"}]"
+                                              + "\"signature\":[{\"name\":\"v0\",\"type\":\"STRING\"},{\"name\":\"v1\",\"type\":\"STRING\"}]"
                                               + "}]";
+
     final Map<String, Object> mvFilteredContext = new HashMap<>(QUERY_CONTEXT_DEFAULT);
     mvFilteredContext.put(PlannerConfig.CTX_KEY_USE_NATIVE_QUERY_EXPLAIN, true);
 
@@ -338,7 +326,7 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
         explainSql,
         mvFilteredContext,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{expectedPlanWithMvfiltered, expectedResources, expectedAttributes})
+        ImmutableList.of(new Object[]{expectedPlanWithMvfiltered, expectedResources})
     );
   }
 
@@ -367,17 +355,16 @@ public class CalciteExplainQueryTest extends BaseCalciteQueryTest
                                 + "\"legacy\":false,"
                                 + "\"context\":{\"defaultTimeout\":300000,\"maxScatterGatherBytes\":9223372036854775807,\"sqlCurrentTimestamp\":\"2000-01-01T00:00:00Z\",\"sqlQueryId\":\"dummy\",\"useNativeQueryExplain\":true,\"vectorize\":\"false\",\"vectorizeVirtualColumns\":\"false\"},"
                                 + "\"granularity\":{\"type\":\"all\"}},"
-                                + "\"signature\":[{\"name\":\"v0\",\"type\":\"LONG\"}],"
-                                + "\"columnMappings\":[{\"queryColumn\":\"v0\",\"outputColumn\":\"EXPR$0\"}]"
+                                + "\"signature\":[{\"name\":\"v0\",\"type\":\"LONG\"}]"
                                 + "}]";
     final String expectedResources = "[{\"name\":\"foo\",\"type\":\"DATASOURCE\"}]";
-    final String expectedAttributes = "{\"statementType\":\"SELECT\",\"targetDataSource\":null}";
+
     // Verify the query plan
     testQuery(
         explainSql,
         queryContext,
         ImmutableList.of(),
-        ImmutableList.of(new Object[]{expectedPlan, expectedResources, expectedAttributes})
+        ImmutableList.of(new Object[]{expectedPlan, expectedResources})
     );
   }
 

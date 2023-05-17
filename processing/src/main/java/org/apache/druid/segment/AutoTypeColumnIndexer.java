@@ -21,7 +21,6 @@ package org.apache.druid.segment;
 
 import org.apache.druid.collections.bitmap.BitmapFactory;
 import org.apache.druid.collections.bitmap.MutableBitmap;
-import org.apache.druid.common.config.NullHandling;
 import org.apache.druid.data.input.impl.DimensionSchema;
 import org.apache.druid.java.util.common.IAE;
 import org.apache.druid.java.util.common.ISE;
@@ -282,10 +281,6 @@ public class AutoTypeColumnIndexer implements DimensionIndexer<StructuredData, S
 
   private ColumnType getLogicalType()
   {
-    if (fieldIndexers.isEmpty()) {
-      // we didn't see anything, so we can be anything, so why not a string?
-      return ColumnType.STRING;
-    }
     if (fieldIndexers.size() == 1 && fieldIndexers.containsKey(NestedPathFinder.JSON_PATH_ROOT)) {
       FieldIndexer rootField = fieldIndexers.get(NestedPathFinder.JSON_PATH_ROOT);
       ColumnType singleType = rootField.getTypes().getSingleType();
@@ -411,7 +406,6 @@ public class AutoTypeColumnIndexer implements DimensionIndexer<StructuredData, S
     if (root == null || !root.isSingleType()) {
       return null;
     }
-    final Object defaultValue = getDefaultValueForType(root.getTypes().getSingleType());
     return new ColumnValueSelector<Object>()
     {
       @Override
@@ -465,12 +459,11 @@ public class AutoTypeColumnIndexer implements DimensionIndexer<StructuredData, S
         if (0 <= dimIndex && dimIndex < dims.length) {
           final StructuredData data = (StructuredData) dims[dimIndex];
           if (data != null) {
-            final Object o = ExprEval.bestEffortOf(data.getValue()).valueOrDefault();
-            return o == null ? defaultValue : o;
+            return ExprEval.bestEffortOf(data.getValue()).valueOrDefault();
           }
         }
 
-        return defaultValue;
+        return null;
       }
 
       @Override
@@ -494,7 +487,7 @@ public class AutoTypeColumnIndexer implements DimensionIndexer<StructuredData, S
 
     private StructuredDataProcessor.ProcessedValue<?> processValue(ExprEval<?> eval)
     {
-      final ExpressionType columnType = eval.type();
+      final ColumnType columnType = ExpressionType.toColumnType(eval.type());
       int sizeEstimate;
       switch (columnType.getType()) {
         case LONG:
@@ -615,20 +608,5 @@ public class AutoTypeColumnIndexer implements DimensionIndexer<StructuredData, S
                                    .setType(logicalType)
                                    .setHasNulls(hasNulls);
     }
-  }
-
-  @Nullable
-  private static Object getDefaultValueForType(@Nullable ColumnType columnType)
-  {
-    if (NullHandling.replaceWithDefault()) {
-      if (columnType != null) {
-        if (ColumnType.LONG.equals(columnType)) {
-          return NullHandling.defaultLongValue();
-        } else if (ColumnType.DOUBLE.equals(columnType)) {
-          return NullHandling.defaultDoubleValue();
-        }
-      }
-    }
-    return null;
   }
 }

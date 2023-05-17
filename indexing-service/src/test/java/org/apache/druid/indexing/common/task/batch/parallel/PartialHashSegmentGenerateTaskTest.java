@@ -92,13 +92,13 @@ public class PartialHashSegmentGenerateTaskTest
   }
 
   @Test
-  public void hasCorrectInputSourceResources()
+  public void hasCorrectInputSourceTypes()
   {
     Assert.assertEquals(
         Collections.singleton(
             new ResourceAction(new Resource(
-                LocalInputSource.TYPE_KEY,
-                ResourceType.EXTERNAL
+                ResourceType.EXTERNAL,
+                LocalInputSource.TYPE_KEY
             ), Action.READ)),
         target.getInputSourceResources()
     );

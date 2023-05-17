@@ -12,7 +12,7 @@ exports[`ExecutionProgressBarPane matches snapshot 1`] = `
         className="cancel"
         onClick={[Function]}
       >
-        (skip waiting)
+        (stop waiting)
       </span>
     </React.Fragment>
   </Unknown>
