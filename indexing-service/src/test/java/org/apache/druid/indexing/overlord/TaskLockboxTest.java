@@ -449,9 +449,9 @@ public class TaskLockboxTest
     );
 
     final TaskLockbox lockbox = new TaskLockbox(taskStorage, metadataStorageCoordinator);
-    TaskLockboxSyncResult result = lockbox.syncFromStorage();
-    Assert.assertEquals(1, result.getTasksToFail().size());
-    Assert.assertTrue(result.getTasksToFail().contains(task));
+    expectedException.expect(IllegalArgumentException.class);
+    expectedException.expectMessage("lock priority[10] is different from task priority[50]");
+    lockbox.syncFromStorage();
   }
 
   @Test
