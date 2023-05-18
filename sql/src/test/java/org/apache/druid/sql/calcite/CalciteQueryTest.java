@@ -8176,10 +8176,6 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   @Test
   public void testGroupByLimitPushDownWithHavingOnLong()
   {
-    if (NullHandling.sqlCompatible()) {
-      msqCompatible();
-    }
-
     testQuery(
         "SELECT dim1, dim2, SUM(cnt) AS thecnt "
         + "FROM druid.foo "
